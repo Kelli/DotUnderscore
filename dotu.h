@@ -7,6 +7,13 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+
+void printChar(char thisChar){
+	if((thisChar>=48 && thisChar<=125)) printf("%c",thisChar);
+	else printf("%X",thisChar);
+}
+
+
 long toBigEndian(char* charArray, int numBytes){
 	int i,total;
 	total=0;
@@ -17,12 +24,13 @@ long toBigEndian(char* charArray, int numBytes){
 }
 
 // Returns the header size
-long attrHdrSize(int nameLength){
+// TODO: I think there's a bug in here...
+long attrHdrSize(long nameLength){
 	// 4 bytes each for value offset, value length, and name length
 	// Plus the number of bytes in the name
 	// Then round up to the nearest word boundary because
 	// of course it's faster that way.
-	return ((12+(long)nameLength+3) / 4) * 4;
+	return ((12*sizeof(char)+(long)nameLength+2) / 4) * 4;
 }
 
 
@@ -122,8 +130,11 @@ struct DotU createDotU(const char *fileName){
 	
 	dp("Reading File\n");
 	char readChar;
-	for (i = 0; (readChar = getc(dotUFile)) != EOF && i < fileLength; dotUBuffer[i++] = readChar);
+	for (i = 0; (readChar = getc(dotUFile)) != EOF && i < fileLength; dotUBuffer[i++] = readChar); //printChar(readChar);
 
+	fclose(dotUFile);
+	
+	
 	// Fill dotU struct
 	struct DotU dotU;
 	dp("Setting up header\n");
@@ -133,6 +144,11 @@ struct DotU createDotU(const char *fileName){
 	for(i=0;i<16;i++) dotU.header.homeFileSystem[i] = (char) dotUBuffer[8+i];
 	dotU.header.numEntries = (uint16_t) toBigEndian(&dotUBuffer[24],2);
 	
+	
+	
+	// The dotU file has various entries.
+	// Extended attributes are usually in the Finder Info.
+	dp("Setting up dotu entries\n");
 	int entryCount,dotUOffset;
 	dotUOffset=26;
 	for(entryCount=0;entryCount<dotU.header.numEntries;entryCount++){
@@ -143,11 +159,13 @@ struct DotU createDotU(const char *fileName){
 		// Data set up according to needs of entry type
 		switch(dotU.entry[entryCount].id){
 			case 2:{
+				dp("Setting up resource fork\n");
 				char *data=(char*)malloc(dotU.entry[entryCount].length);
 				for(i=0;i<dotU.entry[entryCount].length;i++) data[i]=(char)dotUBuffer[dotU.entry[entryCount].offset+i];
 				dotU.entry[entryCount].data.resource.data=data;
 			}break;
 			case 9:{
+				dp("Setting up finder info\n");
 				for(i=0;i<32;i++){
 					dotU.entry[entryCount].data.finder.finderHeader[i]          = dotUBuffer[dotU.entry[entryCount].offset+i];
 				}
@@ -167,15 +185,19 @@ struct DotU createDotU(const char *fileName){
 				}
 				dotU.entry[entryCount].data.finder.xattrHdr.numAttrs          = (uint16_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+68],2);
 				
+				dp("Setting up xattrs\n");
 				struct ExtAttr *attrs=(struct ExtAttr*)malloc(sizeof(struct ExtAttr) * dotU.entry[entryCount].data.finder.xattrHdr.numAttrs);
 				
 				char *entryName;
 				char *entryValue;
-				int charNum;
-				int entryNameLength, entryValueLength;
+				long charNum;
+				long entryNameLength, entryValueLength;
 				long entryHeaderOffset=dotU.entry[entryCount].offset+70;
 				long entryValueOffset;
 				for(i=0;i<dotU.entry[entryCount].data.finder.xattrHdr.numAttrs;i++){
+					// Debug printing
+					printf("Setting up xattr %i :\n",i);
+
 					entryValueOffset = toBigEndian(&dotUBuffer[entryHeaderOffset],4);
 					entryValueLength = toBigEndian(&dotUBuffer[entryHeaderOffset+4],4);
 					entryNameLength  = dotUBuffer[entryHeaderOffset+10];
@@ -194,96 +216,25 @@ struct DotU createDotU(const char *fileName){
 					
 					attrs[i].name=entryName;
 					attrs[i].data=entryValue;
-					
-					
-					//dotU.entry[entryCount].data.finder.attr[i].name=entryName;
-					//dotU.entry[entryCount].data.finder.attr[i].data=entryValue;
+
+					// Debug printing
+					printf("\tNameOffset:  %li\tNameLength:  %li\t Name: %s\n",entryHeaderOffset+11,entryNameLength,entryName);
+					printf("\tValueOffset: %li\tValueLength: %li\t Data: %s\n",entryValueOffset,entryValueLength,entryValue);
 					
 					entryHeaderOffset+=attrHdrSize(entryNameLength);
 				}
 				
 				dotU.entry[entryCount].data.finder.attr=attrs;
 				
-				/*
-					printf("\n\tExtAttrs:\n");
-					//for(k=attrHdrOffset+36;k<entryOffset+entryLength;){
-					int entryHeaderOffset=attrHdrOffset+36;
-					int entryValueOffset;
-					int entryNameLength, entryValueLength;
-					int attrNum;
-					char *entryName;
-					char *entryValue;
-					for(attrNum=1;attrNum<=attrCount;attrNum++){
-						printf("\nATTR # %i\n", attrNum);
-						entryValueOffset = toBigEndian(&byteFile[entryHeaderOffset],4);
-						entryValueLength = toBigEndian(&byteFile[entryHeaderOffset+4],4);
-						entryNameLength  = byteFile[entryHeaderOffset+10];
-
-						printf("\tOffset: %i", entryValueOffset);
-						printf("\tLength: %i", entryValueLength);
-						printf("\tNameLen: %i", entryNameLength);
-
-
-
-						entryName=malloc(sizeof(char)*entryNameLength+1);
-						entryValue=malloc(sizeof(char)*entryValueLength+1);
-						int charNum;
-						for(charNum=0;charNum<=entryNameLength;charNum++){
-							entryName[charNum]=byteFile[entryHeaderOffset+11+charNum];
-						}
-						for(charNum=0;charNum<=entryValueLength;charNum++){
-							entryValue[charNum]=byteFile[entryValueOffset+charNum];
-						}
-						entryValue[entryValueLength]='\0';
-						printf("\n%s : %s",entryName,entryValue);
-						free(entryName);
-						free(entryValue);
-
-						entryHeaderOffset+=ATTR_ENTRY_LENGTH(entryNameLength);
-				
-				
-				
-				
-				
-				dotU.entry[entryCount].data.finder.attr[].name;
-				dotU.entry[entryCount].data.finder.attr[].data;
-				*/
-			
-			
 			}break;
 			default:{
 				printf("\nError.  Unknown Dot-Underscore Entry ID type.");
 			}break;
 		}
-//		struct dotU.entry[entryCount].data=
-		
-		
-		
 		dotUOffset+=12;
 	}
-
-
-
-	
-	
-	// Print contents of dotU file - debug only
-	/*
-	long j=0;
-	while(j < fileLength){
-		if(dotUBuffer[j]>=48 && dotUBuffer[j]<=126) printf("%c",dotUBuffer[j]);
-		else printf(".");
-		j++;
-	}
-	*/
-	
-	fclose(dotUFile);
 	return dotU;
-
 } 
-
-
-
-
 
 
 #endif

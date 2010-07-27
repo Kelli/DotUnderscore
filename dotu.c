@@ -1,3 +1,11 @@
+// This file reads the dot-underscore files that are formed
+// when copying a file from an OSX machine onto a *nix.
+// 
+// Author: Kelli Ireland
+// Summer 2010
+// As part of the Google Summer of Code
+
+
 #include "dotu.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,10 +13,6 @@
 
 
 
-void printChar(char thisChar){
-	if((thisChar>=48 && thisChar<=125)) printf("%c",thisChar);
-	else printf("%X",thisChar);
-}
 
 
 int main(int argc, char *argv[]){
@@ -18,7 +22,7 @@ int main(int argc, char *argv[]){
 	printf("Welcome.\n");
 
 	// Creating new DotU Object
-	struct DotU myDotU = createDotU("test/dotu-f2");
+	struct DotU myDotU = createDotU("test/dotu-fnone");
 	
 	
 	
