@@ -1,3 +1,12 @@
+// This file provides the means to read dot-underscore
+// (._) files that are formed when copying a file
+// from an OSX machine onto a *nix.
+// 
+// Author: Kelli Ireland
+// Summer 2010
+// As part of the Google Summer of Code
+
+
 #ifndef DOTU_H
 #define DOTU_H
 
