@@ -81,7 +81,7 @@ int main(int argc, char *argv[]){
 
 
 	printf("\n\nTesting create-a-dotU:\n");
-	if(createDotUFile!=0){
+	if(createDotUFile(myDotU,"test0")!=0){
 		printf("\nError creating ._ file!\n");
 	} else {
 		printf("Done!");

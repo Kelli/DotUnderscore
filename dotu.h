@@ -35,6 +35,18 @@ long toBigEndian(char* charArray, int numBytes){
 	return total;
 }
 
+char* toSmallEndian(char* num, int numBytes){
+	int i;
+	char * returnArray=(char *)malloc(sizeof(char)*numBytes);
+	for(i=0;i<numBytes;i++){
+		returnArray[i]=num[numBytes-i-1];
+	}
+	return returnArray;
+	
+}
+
+
+
 /* Returns the header size */
 /* TODO: I think there's a bug in here... */
 long attrHdrSize(long nameLength){
@@ -256,17 +268,115 @@ struct DotU readDotUFile(const char *fileName){
 	return dotU;
 } 
 
-int createDotUFile(struct DotU dotU, char * parentFileName){
+int createDotUFile(struct DotU dotU, const char * parentFileName){
 	char *dotUFileName;
+	char *prefix = "a._";
 	FILE *dotUFile;
+	int i;
 	
 	printf("Allocating filename for ._\n");
-	dotUFileName=(char*)malloc(sizeof(char) * strlen(parentFileName)+3);
-	*dotUFileName=strncat("a._",parentFileName, 253);
+	printf("Parent file name is %s and is %i characters long.\n",parentFileName,(int)strlen(parentFileName));
+	dotUFileName=(char*)malloc(sizeof(char) * (strlen(parentFileName)+strlen(prefix)));
+	strcpy(dotUFileName,prefix);
+	/* TODO: Max file name size? */
+	dotUFileName=strncat(dotUFileName,parentFileName,(strlen(parentFileName)+strlen(prefix)));
+	printf("Child file name is %s %s %s and is %i characters long.\n",prefix,parentFileName,dotUFileName,(int) (strlen(parentFileName)+strlen(prefix)));
 	
-	printf("Output file: %s",dotUFileName);
+	printf("Output file: %s\n",dotUFileName);
 	
-	dotUFile = fopen(&dotUFileName, "wb");
+	dotUFile = fopen(dotUFileName, "wb");
+	
+	
+	/* Writing DotU File Header */
+	/* 4 bytes  - magic num
+	   4 bytes  - version num
+	   16 bytes - home file system
+	   2 bytes  - number of dotU entries (usually 2)
+	*/
+	fwrite(toSmallEndian((char*)&dotU.header.magicNum,4),1,4,dotUFile);
+	fwrite(toSmallEndian((char*)&dotU.header.versionNum,4),1,4,dotUFile);
+	fwrite(dotU.header.homeFileSystem,1,16,dotUFile);
+	fwrite(toSmallEndian((char*)&dotU.header.numEntries,2),1,2,dotUFile);
+	
+	/* DotU entry list - For each:
+	   4 bytes - ID
+	   4 bytes - offset
+	   4 bytes - length
+	*/
+	for(i=0;i<dotU.header.numEntries;i++){
+		fwrite(toSmallEndian((char*)&dotU.entry[i].id,4),1,4,dotUFile);
+		fwrite(toSmallEndian((char*)&dotU.entry[i].offset,4),1,4,dotUFile);
+		fwrite(toSmallEndian((char*)&dotU.entry[i].length,4),1,4,dotUFile);
+	}
+	/* Next comes the Finder Info and Xattr Header (DotU entry ID == 9)
+	   TODO: Verify that the offset and length of Finder Info are what would be expected.
+	   32 bytes  - header
+	   2 bytes   - padding
+	
+	   4 bytes   - xattr Magic Num 
+	   4 bytes   - debug tag (parent file id)
+	   4 bytes   - size of ...?
+	   4 bytes   - file offset for xattr data
+	   4 bytes   - length of xattr data block
+	   12 bytes  - reserved ...?
+	   2 bytes   - attribute flags
+	   2 bytes   - number of xattrs
+	*/
+	/* TODO: This probably shouldn't rely on being entry[0] */
+	fwrite(dotU.entry[0].data.finder.finderHeader,1,32,dotUFile);
+	fwrite(dotU.entry[0].data.finder.padding,1,2,dotUFile);	
+	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.headerMagicNum,4),1,4,dotUFile);
+	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.debugTag,4),1,4,dotUFile);
+	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.size,4),1,4,dotUFile);
+	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.attrDataOffset,4),1,4,dotUFile);
+	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.attrDataLength,4),1,4,dotUFile);
+	fwrite(dotU.entry[0].data.finder.xattrHdr.attrReserved,1,12,dotUFile);	
+	fwrite(dotU.entry[0].data.finder.xattrHdr.attrFlags,1,2,dotUFile);	
+	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.numAttrs,2),1,2,dotUFile);
+	
+	/* TODO: Write xattrs to file */
+	
+
+	
+	
+	
+	/*			
+				dp("Setting up xattrs\n");
+				attrs=(struct ExtAttr*)malloc(sizeof(struct ExtAttr) * dotU.entry[entryCount].data.finder.xattrHdr.numAttrs);
+				entryHeaderOffset=dotU.entry[entryCount].offset+70;
+				for(i=0;i<dotU.entry[entryCount].data.finder.xattrHdr.numAttrs;i++){
+
+
+					entryValueOffset = toBigEndian(&dotUBuffer[entryHeaderOffset],4);
+					entryValueLength = toBigEndian(&dotUBuffer[entryHeaderOffset+4],4);
+					entryNameLength  = dotUBuffer[entryHeaderOffset+10];
+					
+					entryName=malloc(sizeof(char)*entryNameLength+1);
+					entryValue=malloc(sizeof(char)*entryValueLength+1);
+					
+					for(charNum=0;charNum<=entryNameLength;charNum++){
+						entryName[charNum]=dotUBuffer[entryHeaderOffset+11+charNum];
+					}
+					entryName[entryNameLength]='\0';
+					for(charNum=0;charNum<=entryValueLength;charNum++){
+						entryValue[charNum]=dotUBuffer[entryValueOffset+charNum];
+					}
+					entryValue[entryValueLength]='\0';
+					
+					attrs[i].name=entryName;
+					attrs[i].data=entryValue;
+
+					printf("\tNameOffset:  %li\tNameLength:  %li\t Name: %s\n",entryHeaderOffset+11,entryNameLength,entryName);
+					printf("\tValueOffset: %li\tValueLength: %li\t Data: %s\n",entryValueOffset,entryValueLength,entryValue);
+					
+					entryHeaderOffset+=attrHdrSize(entryNameLength);
+				}
+				
+				dotU.entry[entryCount].data.finder.attr=attrs;
+*/
+	
+		/* TODO: Write resource fork to file */
+	
 	
 	fclose(dotUFile);
 	return 0;

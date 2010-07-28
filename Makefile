@@ -7,4 +7,4 @@ dotU: dotU.c
 	$(CC) $(STRICT) dotU.c -o dotU
 
 clean:
-	rm -f *.o dotU
+	rm -f *.o *.out dotU
