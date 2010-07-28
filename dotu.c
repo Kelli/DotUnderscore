@@ -1,10 +1,10 @@
-// This file reads the dot-underscore files that are formed
-// when copying a file from an OSX machine onto a *nix.
-// 
-// Author: Kelli Ireland
-// Summer 2010
-// As part of the Google Summer of Code
-
+/* This file reads the dot-underscore files that are formed
+	 when copying a file from an OSX machine onto a *nix.
+ 
+	 Author: Kelli Ireland
+	 Summer 2010
+	 As part of the Google Summer of Code
+*/
 
 #include "dotu.h"
 #include <stdio.h>
@@ -16,29 +16,25 @@
 
 
 int main(int argc, char *argv[]){
+	struct DotU myDotU;
+	int i,j;
 	
-	
-	// Start program
+	/* Start program */
 	printf("Welcome.\n");
 
-	// Creating new DotU Object
-	struct DotU myDotU = createDotU("test/dotu-fnone");
+	/* Initializing DotU struct with data from file*/
+	myDotU = readDotUFile("test/dotu-f1");
+
+
 	
 	
-	
-	
-	
-	
-	// Initializing DotU Object with data from file
-	
-	
-	// Printing details of DotU Object
+	/* Printing details of DotU Object */
 	printf("\nFile Magic Number: 0x%.8x",myDotU.header.magicNum);
 	printf("\nFile Version Number: 0x%.8x",myDotU.header.versionNum);
 	printf("\nFile Home File System: %16s",myDotU.header.homeFileSystem);
 	printf("\nFile Number of entries: %i",myDotU.header.numEntries);
 	
-	int i,j;
+
 	for(i=0;i<myDotU.header.numEntries;i++){
 		printf("\nEntry ID: %i",myDotU.entry[i].id);
 		printf("\n\tEntry Offset: %i", myDotU.entry[i].offset);
@@ -47,13 +43,12 @@ int main(int argc, char *argv[]){
 		switch(myDotU.entry[i].id){
 			case 2:{
 				printf("\n\tResource Fork.");
-				// Shows data in the resource fork
+				/* Shows data in the resource fork */
 				printf("\n\t\tData: ");
 				for(j=0;j<myDotU.entry[i].length;j++)printChar(myDotU.entry[i].data.resource.data[j]);
 			}break;
 			case 9:{
 				printf("\n\tFinder Info.");
-				// TODO: Fill in details
 				printf("\n\tFirst 32 bytes reserved by FinderInfo (16 header, 16 extended): ");
 					for(j=0;j<32;j++) printChar(myDotU.entry[i].data.finder.finderHeader[j]);
 				printf("\n\tPadding (16 bits): ");
@@ -85,7 +80,12 @@ int main(int argc, char *argv[]){
 	}
 
 
-
+	printf("\n\nTesting create-a-dotU:\n");
+	if(createDotUFile!=0){
+		printf("\nError creating ._ file!\n");
+	} else {
+		printf("Done!");
+	}
 	
 
 	printf("\nGoodbye.\n");
