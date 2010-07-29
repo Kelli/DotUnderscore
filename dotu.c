@@ -68,7 +68,7 @@ int main(int argc, char *argv[]){
 				printf("\n\t\tAttr Header Num Attrs: %i",myDotU.entry[i].data.finder.xattrHdr.numAttrs);
 				
 				for(j=0;j<myDotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
-					printf("\n\t\t\tAttr #%i : %s : %s",j,myDotU.entry[i].data.finder.attr[j].name,myDotU.entry[i].data.finder.attr[j].data);
+					printf("\n\t\t\tAttr #%i : %s : %s",j,myDotU.entry[i].data.finder.attr[j].name,myDotU.entry[i].data.finder.attr[j].value);
 				}
 				
 				

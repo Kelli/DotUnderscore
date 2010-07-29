@@ -41,8 +41,14 @@ struct ExtAttrHeader{
 };
 
 struct ExtAttr{
-	char * name;
-	char * data;
+	uint32_t valueOffset;
+	uint32_t valueLength;
+	char flags[2];
+	uint8_t nameLength;
+	/* The name is stored in the dot-u file as a null-terminated string, 128 bytes max */
+	char * name; 
+	char * value;
+	
 };
 
 
@@ -91,6 +97,7 @@ void bufWrite(char* buf,long startIndex,char* data,long length){
 	long i;
 	for(i=0;i<length;i++){
 		buf[startIndex+i] = data[i];
+		printf("%c",data[i]);
 	}
 	return;
 }
@@ -134,11 +141,14 @@ long sizeNeeded(struct DotU dotU){
 /* Returns the header size */
 /* TODO: I think there's a bug in here... */
 long attrHdrSize(long nameLength){
-	/* 4 bytes each for value offset, value length, and name length
+	/* 4 bytes each for value offset, value length, 
+	   2 bytes for flags, 1 bytes for name length
 	 Plus the number of bytes in the name
+	 Plus 1 for being null-terminated
 	 Then round up to the nearest word boundary because
-	 of course it's faster that way... */
-	return ((12*sizeof(char)+(long)nameLength+2) / 4) * 4;
+	 of course mem reads are faster that way... */
+	long bitFilter = 3L;
+	return ((sizeof(char)*(11+(long)nameLength+1) + bitFilter) & ~bitFilter);
 }
 
 
@@ -162,9 +172,11 @@ struct DotU readDotUFile(const char *fileName){
 	char *entryName;
 	char *entryValue;
 	long charNum;
-	long entryNameLength, entryValueLength;
+	uint8_t entryNameLength;
+	long entryValueLength;
 	long entryHeaderOffset;
 	long entryValueOffset;
+	char attrFlags[2];
 
 	/* Note: Using fstat() to obtain size based on advice from
 	 https://www.securecoding.cert.org/confluence/display/seccode/FIO19-C.+Do+not+use+fseek%28%29+and+ftell%28%29+to+compute+the+size+of+a+file
@@ -197,7 +209,7 @@ struct DotU readDotUFile(const char *fileName){
 	
 	printf("Reading File\n"); /* DEBUG PRINT */
 
-	for (i = 0; (readChar = getc(dotUFile)) != EOF && i < fileLength; dotUBuffer[i++] = readChar);
+	for (i = 0; (readChar = getc(dotUFile)) != EOF && i < fileLength; dotUBuffer[i++] = readChar) printChar(readChar);
 	fclose(dotUFile);
 	
 	/* Fill dotU struct */
@@ -260,6 +272,9 @@ struct DotU readDotUFile(const char *fileName){
 
 					entryValueOffset = toBigEndian(&dotUBuffer[entryHeaderOffset],4);
 					entryValueLength = toBigEndian(&dotUBuffer[entryHeaderOffset+4],4);
+					for(charNum=0;charNum<=1;charNum++){
+						attrFlags[charNum]=dotUBuffer[entryHeaderOffset+8+charNum];
+					}
 					entryNameLength  = dotUBuffer[entryHeaderOffset+10];
 					
 					entryName=malloc(sizeof(char)*entryNameLength+1);
@@ -275,11 +290,15 @@ struct DotU readDotUFile(const char *fileName){
 					entryValue[entryValueLength]='\0';
 					
 					attrs[i].name=entryName;
-					attrs[i].data=entryValue;
-
+					attrs[i].value=entryValue;
+					attrs[i].valueOffset=entryValueOffset;
+					attrs[i].valueLength=entryValueLength;
+					for(charNum=0;charNum<2;charNum++) attrs[i].flags[charNum]=attrFlags[charNum];
+					attrs[i].nameLength=entryNameLength;
+										
 					/* Debug printing */
-					printf("\tNameOffset:  %li\tNameLength:  %li\t Name: %s\n",entryHeaderOffset+11,entryNameLength,entryName);
-					printf("\tValueOffset: %li\tValueLength: %li\t Data: %s\n",entryValueOffset,entryValueLength,entryValue);
+					printf("\tNameOffset:  %li\tNameLength:  %i\t Name:  %s\n",entryHeaderOffset+11,(int) entryNameLength,entryName);
+					printf("\tValueOffset: %li\tValueLength: %li\t Value: %s\n",entryValueOffset,entryValueLength,entryValue);
 					
 					entryHeaderOffset+=attrHdrSize(entryNameLength);
 				}
@@ -301,7 +320,7 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	char *prefix = "a._";
 	char *fileBuffer;
 	FILE *dotUFile;
-	long i,j;
+	long i,j,k;
 	long bufferSize;
 	long bufIndex;
 	
@@ -376,7 +395,33 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 					/* Now write the xattrs */
 					bufIndex=dotU.entry[i].data.finder.xattrHdr.attrDataOffset;
 					for(j=0;j<dotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
+						/* Each xattr has a header part and a data part.
+						   The header part is:
+						   4 bytes             - Value offset (from beginning of DotU file)
+						   4 bytes             - value length
+						   2 bytes             - flags 
+						TODO: Figure out what the flags are.
+						   1 byte              - name length (128 byte max)
+						   name length bytes   - name (null-terminated)
+						   padding (if needed) - to nearest word (4-byte) boundary
 						
+						   The value part is in the heap after all of the headers, 
+						   and position is specified by the value's offset and length. */
+							bufWrite(fileBuffer,bufIndex,toSmallEndian((char*)&dotU.entry[i].data.finder.attr[j].valueOffset,4),4);
+							bufWrite(fileBuffer,bufIndex+4,toSmallEndian((char*)&dotU.entry[i].data.finder.attr[j].valueLength,4),4);
+							/* Technically, the nameLength should only be 2 bytes long, but there shouldn't
+							   be harm in padding with 0's. */
+							bufWrite(fileBuffer,bufIndex+8,dotU.entry[i].data.finder.attr[j].flags,2); 
+							bufWrite(fileBuffer,bufIndex+10,(char*)&dotU.entry[i].data.finder.attr[j].nameLength,1); 
+							/* The name is stored in the dot-u file as a null-terminated string, 128 bytes max */
+							bufWrite(fileBuffer,bufIndex+12,dotU.entry[i].data.finder.attr[j].name,dotU.entry[i].data.finder.attr[j].nameLength+1);
+							printf("\nwriting :");
+							for(k=0;k<dotU.entry[i].data.finder.attr[j].nameLength+1;k++) printf("%c",dotU.entry[i].data.finder.attr[j].name[k]);
+							
+							/* Write the value of the attr */
+							bufWrite(fileBuffer,dotU.entry[i].data.finder.attr[j].valueOffset,dotU.entry[i].data.finder.attr[j].value, dotU.entry[i].data.finder.attr[j].valueLength);
+							
+							bufIndex+=attrHdrSize(dotU.entry[i].data.finder.attr[j].nameLength);
 					}
 					
 					
@@ -390,71 +435,8 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 		
 	
 	}
-	/*
-	union entryData {
-	struct ResourceEntry resource;
-	struct FinderEntry finder;
-};
-
-
-struct DotUEntry {
-	uint32_t id;
-	uint32_t offset;
-	uint32_t length;
-	union entryData data;
-};
- */
-	
-	
-
-	
-	/* TODO: This probably shouldn't rely on being entry[0] */
-	
-	
-	
-	
-	/* TODO: Write xattrs to file */
-	
-
-	
-	
-	
-		
-//				printf("Setting up xattrs\n"); /* DEBUG PRINT */
-	/*			attrs=(struct ExtAttr*)malloc(sizeof(struct ExtAttr) * dotU.entry[entryCount].data.finder.xattrHdr.numAttrs);
-				entryHeaderOffset=dotU.entry[entryCount].offset+70;
-				for(i=0;i<dotU.entry[entryCount].data.finder.xattrHdr.numAttrs;i++){
-
-
-					entryValueOffset = toBigEndian(&dotUBuffer[entryHeaderOffset],4);
-					entryValueLength = toBigEndian(&dotUBuffer[entryHeaderOffset+4],4);
-					entryNameLength  = dotUBuffer[entryHeaderOffset+10];
-					
-					entryName=malloc(sizeof(char)*entryNameLength+1);
-					entryValue=malloc(sizeof(char)*entryValueLength+1);
-					
-					for(charNum=0;charNum<=entryNameLength;charNum++){
-						entryName[charNum]=dotUBuffer[entryHeaderOffset+11+charNum];
-					}
-					entryName[entryNameLength]='\0';
-					for(charNum=0;charNum<=entryValueLength;charNum++){
-						entryValue[charNum]=dotUBuffer[entryValueOffset+charNum];
-					}
-					entryValue[entryValueLength]='\0';
-					
-					attrs[i].name=entryName;
-					attrs[i].data=entryValue;
-
-					printf("\tNameOffset:  %li\tNameLength:  %li\t Name: %s\n",entryHeaderOffset+11,entryNameLength,entryName);
-					printf("\tValueOffset: %li\tValueLength: %li\t Data: %s\n",entryValueOffset,entryValueLength,entryValue);
-					
-					entryHeaderOffset+=attrHdrSize(entryNameLength);
-				}
-				
-				dotU.entry[entryCount].data.finder.attr=attrs;
-*/
-	
-		/* TODO: Write resource fork to file */
+	/* Last 2 bytes should be EOF */
+	for(i=1;i<=2;i++) fileBuffer[bufferSize-i]=EOF;
 	
 	
 		
