@@ -23,14 +23,14 @@
 
 
 struct DotUHeader {
-	uint32_t magicNum;
+	char magic[4];
 	uint32_t versionNum;
 	char homeFileSystem[16];
 	uint16_t numEntries;
 };
 
 struct ExtAttrHeader{
-	uint32_t headerMagicNum;
+	char headerMagic[4];
 	uint32_t debugTag;
 	uint32_t size;
 	uint32_t attrDataOffset;
@@ -83,7 +83,7 @@ struct DotU {
 
 void printChar(char thisChar){
 	if((thisChar>=48 && thisChar<=125)) printf("%c",thisChar);
-	else printf("%X",thisChar);
+	else printf("%.2X",thisChar);
 }
 
 /* Writes char array to buffer */
@@ -203,7 +203,7 @@ struct DotU readDotUFile(const char *fileName){
 	/* Fill dotU struct */
 	printf("Setting up header\n"); /* DEBUG PRINT */
 	/* dotU header */
-	dotU.header.magicNum = (uint32_t) toBigEndian(&dotUBuffer[0],4);
+	for(i=0;i<16;i++) dotU.header.magic[i] = (char) dotUBuffer[i];
 	dotU.header.versionNum = (uint32_t) toBigEndian(&(dotUBuffer[4]),4);
 	for(i=0;i<16;i++) dotU.header.homeFileSystem[i] = (char) dotUBuffer[8+i];
 	dotU.header.numEntries = (uint16_t) toBigEndian(&dotUBuffer[24],2);
@@ -236,7 +236,9 @@ struct DotU readDotUFile(const char *fileName){
 				for(i=0;i<2;i++){
 					dotU.entry[entryCount].data.finder.padding[i]               = dotUBuffer[dotU.entry[entryCount].offset+32+i];
 				}
-				dotU.entry[entryCount].data.finder.xattrHdr.headerMagicNum    = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+34],4);
+				for(i=0;i<4;i++){
+				dotU.entry[entryCount].data.finder.xattrHdr.headerMagic[i]    = dotUBuffer[dotU.entry[entryCount].offset+34+i];
+				}
 				dotU.entry[entryCount].data.finder.xattrHdr.debugTag          = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+38],4);
 				dotU.entry[entryCount].data.finder.xattrHdr.size              = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+42],4);
 				dotU.entry[entryCount].data.finder.xattrHdr.attrDataOffset    = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+46],4);
@@ -299,7 +301,7 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	char *prefix = "a._";
 	char *fileBuffer;
 	FILE *dotUFile;
-	long i;
+	long i,j;
 	long bufferSize;
 	long bufIndex;
 	
@@ -316,7 +318,7 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	   16 bytes - home file system
 	   2 bytes  - number of dotU entries (usually 2)
 	*/
-	bufWrite(fileBuffer,0,toSmallEndian((char*)&dotU.header.magicNum,4),4);
+	bufWrite(fileBuffer,0,dotU.header.magic,4);
 	bufWrite(fileBuffer,4,toSmallEndian((char*)&dotU.header.versionNum,4),4);
 	bufWrite(fileBuffer,8,dotU.header.homeFileSystem,16);
 	bufWrite(fileBuffer,24,toSmallEndian((char*)&dotU.header.numEntries,2),2);
@@ -333,31 +335,80 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 		bufWrite(fileBuffer,bufIndex+8,toSmallEndian((char*)&dotU.entry[i].length,4),4);
 		bufIndex+=12;
 	}
-	/* Next comes the Finder Info and Xattr Header (DotU entry ID == 9)
-	   TODO: Verify that the offset and length of Finder Info are what would be expected.
-	   32 bytes  - header
-	   2 bytes   - padding
 	
-	   4 bytes   - xattr Magic Num 
-	   4 bytes   - debug tag (parent file id)
-	   4 bytes   - size of ...?
-	   4 bytes   - file offset for xattr data
-	   4 bytes   - length of xattr data block
-	   12 bytes  - reserved ...?
-	   2 bytes   - attribute flags
-	   2 bytes   - number of xattrs
-	*/
+	/* Now write each entry */
+	for(i=0;i<dotU.header.numEntries;i++){
+		switch(dotU.entry[i].id){
+			/* Resource */
+			case 2:{
+				/* TODO: pad this if needed with 1's? */
+				bufWrite(fileBuffer,dotU.entry[i].offset,dotU.entry[i].data.resource.data,dotU.entry[i].length);
+			} break;
+			
+			/* Finder Info, where xattrs live */
+			case 9: {
+				/* Next comes the Finder Info and Xattr Header (DotU entry ID == 9)
+				   TODO: Verify that the offset and length of Finder Info are what would be expected.
+				   32 bytes  - header
+				   2 bytes   - padding
+
+				   4 bytes   - xattr Magic Num 
+				   4 bytes   - debug tag (parent file id)
+				   4 bytes   - size of ...?
+				   4 bytes   - file offset for xattr data
+				   4 bytes   - length of xattr data block
+				   12 bytes  - reserved ...?
+				   2 bytes   - attribute flags
+				   2 bytes   - number of xattrs
+				*/
+					bufWrite(fileBuffer,dotU.entry[i].offset,dotU.entry[i].data.finder.finderHeader,32);
+					bufWrite(fileBuffer,dotU.entry[i].offset+32,dotU.entry[i].data.finder.padding,2);
+
+					bufWrite(fileBuffer,dotU.entry[i].offset+34,dotU.entry[i].data.finder.xattrHdr.headerMagic,4);
+					bufWrite(fileBuffer,dotU.entry[i].offset+38,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.debugTag,4),4);
+					bufWrite(fileBuffer,dotU.entry[i].offset+42,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.size,4),4);
+					bufWrite(fileBuffer,dotU.entry[i].offset+46,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.attrDataOffset,4),4);
+					bufWrite(fileBuffer,dotU.entry[i].offset+50,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.attrDataLength,4),4);
+					bufWrite(fileBuffer,dotU.entry[i].offset+54,dotU.entry[i].data.finder.xattrHdr.attrReserved,12);
+					bufWrite(fileBuffer,dotU.entry[i].offset+66,dotU.entry[i].data.finder.xattrHdr.attrFlags,2);
+					bufWrite(fileBuffer,dotU.entry[i].offset+68,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.numAttrs,2),2);
+					
+					/* Now write the xattrs */
+					bufIndex=dotU.entry[i].data.finder.xattrHdr.attrDataOffset;
+					for(j=0;j<dotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
+						
+					}
+					
+					
+			}break;
+			
+			/* Other/Unknown */
+			default:{ 
+				printf("Unknown DotU entry type.  Cannot write.\n");
+			} break;
+		}
+		
+	
+	}
+	/*
+	union entryData {
+	struct ResourceEntry resource;
+	struct FinderEntry finder;
+};
+
+
+struct DotUEntry {
+	uint32_t id;
+	uint32_t offset;
+	uint32_t length;
+	union entryData data;
+};
+ */
+	
+	
+
+	
 	/* TODO: This probably shouldn't rely on being entry[0] */
-//	fwrite(dotU.entry[0].data.finder.finderHeader,1,32,dotUFile);
-//	fwrite(dotU.entry[0].data.finder.padding,1,2,dotUFile);	
-//	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.headerMagicNum,4),1,4,dotUFile);
-//	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.debugTag,4),1,4,dotUFile);
-//	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.size,4),1,4,dotUFile);
-//	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.attrDataOffset,4),1,4,dotUFile);
-//	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.attrDataLength,4),1,4,dotUFile);
-//	fwrite(dotU.entry[0].data.finder.xattrHdr.attrReserved,1,12,dotUFile);	
-//	fwrite(dotU.entry[0].data.finder.xattrHdr.attrFlags,1,2,dotUFile);	
-//	fwrite(toSmallEndian((char*)&dotU.entry[0].data.finder.xattrHdr.numAttrs,2),1,2,dotUFile);
 	
 	
 	

@@ -29,7 +29,8 @@ int main(int argc, char *argv[]){
 	
 	
 	/* Printing details of DotU Object */
-	printf("\nFile Magic Number: 0x%.8x",myDotU.header.magicNum);
+	printf("\nFile Magic Number: ");
+		for(j=0;j<4;j++) printChar(myDotU.header.magic[j]);
 	printf("\nFile Version Number: 0x%.8x",myDotU.header.versionNum);
 	printf("\nFile Home File System: %16s",myDotU.header.homeFileSystem);
 	printf("\nFile Number of entries: %i",myDotU.header.numEntries);
@@ -54,7 +55,8 @@ int main(int argc, char *argv[]){
 				printf("\n\tPadding (16 bits): ");
 					for(j=0;j<2;j++) printChar(myDotU.entry[i].data.finder.padding[j]);				
 				printf("\n\tExt Attr Header:");
-				printf("\n\t\tAttr Header Magic: %.8x",myDotU.entry[i].data.finder.xattrHdr.headerMagicNum);
+				printf("\n\t\tAttr Header Magic: ");
+					for(j=0;j<4;j++) printChar(myDotU.entry[i].data.finder.xattrHdr.headerMagic[j]);				
 				printf("\n\t\tAttr Header Debug tag: %.8x",myDotU.entry[i].data.finder.xattrHdr.debugTag);
 				printf("\n\t\tAttr Header Total Size: %i",myDotU.entry[i].data.finder.xattrHdr.size);
 				printf("\n\t\tAttr Header Data Start: %i",myDotU.entry[i].data.finder.xattrHdr.attrDataOffset);
