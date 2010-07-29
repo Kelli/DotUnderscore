@@ -299,8 +299,9 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	char *prefix = "a._";
 	char *fileBuffer;
 	FILE *dotUFile;
-	int i;
+	long i;
 	long bufferSize;
+	long bufIndex;
 	
 	bufferSize = sizeNeeded(dotU);
 	fileBuffer=(char *)malloc(sizeof(char)*bufferSize);
@@ -320,25 +321,18 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	bufWrite(fileBuffer,8,dotU.header.homeFileSystem,16);
 	bufWrite(fileBuffer,24,toSmallEndian((char*)&dotU.header.numEntries,2),2);
 	
-	
-
-	
-
-//	fwrite(toSmallEndian((char*)&dotU.header.magicNum,4),1,4,dotUFile);
-//	fwrite(toSmallEndian((char*)&dotU.header.versionNum,4),1,4,dotUFile);
-//	fwrite(dotU.header.homeFileSystem,1,16,dotUFile);
-//	fwrite(toSmallEndian((char*)&dotU.header.numEntries,2),1,2,dotUFile);
-	
 	/* DotU entry list - For each:
 	   4 bytes - ID
 	   4 bytes - offset
 	   4 bytes - length
 	*/
-//	for(i=0;i<dotU.header.numEntries;i++){
-//		fwrite(toSmallEndian((char*)&dotU.entry[i].id,4),1,4,dotUFile);
-//		fwrite(toSmallEndian((char*)&dotU.entry[i].offset,4),1,4,dotUFile);
-//		fwrite(toSmallEndian((char*)&dotU.entry[i].length,4),1,4,dotUFile);
-//	}
+		bufIndex=26;
+	for(i=0;i<dotU.header.numEntries;i++){
+		bufWrite(fileBuffer,bufIndex,toSmallEndian((char*)&dotU.entry[i].id,4),4);
+		bufWrite(fileBuffer,bufIndex+4,toSmallEndian((char*)&dotU.entry[i].offset,4),4);
+		bufWrite(fileBuffer,bufIndex+8,toSmallEndian((char*)&dotU.entry[i].length,4),4);
+		bufIndex+=12;
+	}
 	/* Next comes the Finder Info and Xattr Header (DotU entry ID == 9)
 	   TODO: Verify that the offset and length of Finder Info are what would be expected.
 	   32 bytes  - header
