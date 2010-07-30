@@ -317,10 +317,11 @@ struct DotU readDotUFile(const char *fileName){
 
 int createDotUFile(struct DotU dotU, const char * parentFileName){
 	char *dotUFileName;
-	char *prefix = "a._";
+	char *prefix = "-t0";
 	char *fileBuffer;
 	FILE *dotUFile;
 	long i,j;
+		uint32_t k;
 	long bufferSize;
 	long bufIndex;
 	
@@ -418,7 +419,7 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 				
 
 	printf("\nBuffer is: Writing at buf index: %li\n",bufIndex+11);
-	uint32_t k;
+
 	for(k=0;k<bufferSize;k++) printChar(fileBuffer[k]);
 
 
@@ -455,9 +456,11 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	printf("\nAllocating filename for ._\n");
 	printf("Parent file name is %s and is %i characters long.\n",parentFileName,(int)strlen(parentFileName));
 	dotUFileName=(char*)malloc(sizeof(char) * (strlen(parentFileName)+strlen(prefix)));
-	strcpy(dotUFileName,prefix);
+	/*strcpy(dotUFileName,prefix); */
+	strcpy(dotUFileName,parentFileName);
 	/* TODO: Max file name size? */
-	dotUFileName=strncat(dotUFileName,parentFileName,(strlen(parentFileName)+strlen(prefix)));
+	/*dotUFileName=strncat(dotUFileName,parentFileName,(strlen(parentFileName)+strlen(prefix)));*/
+	dotUFileName=strncat(dotUFileName,prefix,(strlen(parentFileName)+strlen(prefix)));
 	printf("Child file name is %s %s %s and is %i characters long.\n",prefix,parentFileName,dotUFileName,(int) (strlen(parentFileName)+strlen(prefix)));
 	
 	printf("Output file: %s\n",dotUFileName);

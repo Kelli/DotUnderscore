@@ -19,11 +19,16 @@ int main(int argc, char *argv[]){
 	struct DotU myDotU;
 	int i,j;
 	
+	if(argc!=2){
+		printf("Usage: %s filename\n",argv[0]);
+		return -1;
+	}
+	
 	/* Start program */
 	printf("Welcome.\n");
 
 	/* Initializing DotU struct with data from file*/
-	myDotU = readDotUFile("test/dotu-f1");
+	myDotU = readDotUFile(argv[1]);
 
 
 	
@@ -83,7 +88,7 @@ int main(int argc, char *argv[]){
 
 
 	printf("\n\nTesting create-a-dotU:\n");
-	if(createDotUFile(myDotU,"test0")!=0){
+	if(createDotUFile(myDotU,argv[1])!=0){
 		printf("\nError creating ._ file!\n");
 	} else {
 		printf("Done!");
