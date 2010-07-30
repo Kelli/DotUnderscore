@@ -320,7 +320,7 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	char *prefix = "a._";
 	char *fileBuffer;
 	FILE *dotUFile;
-	long i,j,k;
+	long i,j;
 	long bufferSize;
 	long bufIndex;
 	
@@ -393,7 +393,7 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 					bufWrite(fileBuffer,dotU.entry[i].offset+68,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.numAttrs,2),2);
 					
 					/* Now write the xattrs */
-					bufIndex=dotU.entry[i].data.finder.xattrHdr.attrDataOffset;
+					bufIndex=dotU.entry[i].offset+70;
 					for(j=0;j<dotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
 						/* Each xattr has a header part and a data part.
 						   The header part is:
@@ -414,14 +414,23 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 							bufWrite(fileBuffer,bufIndex+8,dotU.entry[i].data.finder.attr[j].flags,2); 
 							bufWrite(fileBuffer,bufIndex+10,(char*)&dotU.entry[i].data.finder.attr[j].nameLength,1); 
 							/* The name is stored in the dot-u file as a null-terminated string, 128 bytes max */
-							bufWrite(fileBuffer,bufIndex+12,dotU.entry[i].data.finder.attr[j].name,dotU.entry[i].data.finder.attr[j].nameLength+1);
-							printf("\nwriting :");
-							for(k=0;k<dotU.entry[i].data.finder.attr[j].nameLength+1;k++) printf("%c",dotU.entry[i].data.finder.attr[j].name[k]);
-							
+							bufWrite(fileBuffer,bufIndex+11,dotU.entry[i].data.finder.attr[j].name,dotU.entry[i].data.finder.attr[j].nameLength);
+				
+
+	printf("\nBuffer is: Writing at buf index: %li\n",bufIndex+11);
+	uint32_t k;
+	for(k=0;k<bufferSize;k++) printChar(fileBuffer[k]);
+
+
+							printf("%s\n",dotU.entry[i].data.finder.attr[j].name);
 							/* Write the value of the attr */
 							bufWrite(fileBuffer,dotU.entry[i].data.finder.attr[j].valueOffset,dotU.entry[i].data.finder.attr[j].value, dotU.entry[i].data.finder.attr[j].valueLength);
 							
+	printf("\nBuffer is: Writing at buf index: %u\n",dotU.entry[i].data.finder.attr[j].valueOffset);
+	for(k=0;k<bufferSize;k++) printChar(fileBuffer[k]);
+
 							bufIndex+=attrHdrSize(dotU.entry[i].data.finder.attr[j].nameLength);
+
 					}
 					
 					
@@ -438,10 +447,12 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	/* Last 2 bytes should be EOF */
 	for(i=1;i<=2;i++) fileBuffer[bufferSize-i]=EOF;
 	
+	printf("\nBuffer is:\n");
+	for(i=0;i<bufferSize;i++) printChar(fileBuffer[i]);
 	
 		
 	
-	printf("Allocating filename for ._\n");
+	printf("\nAllocating filename for ._\n");
 	printf("Parent file name is %s and is %i characters long.\n",parentFileName,(int)strlen(parentFileName));
 	dotUFileName=(char*)malloc(sizeof(char) * (strlen(parentFileName)+strlen(prefix)));
 	strcpy(dotUFileName,prefix);
