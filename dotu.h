@@ -93,18 +93,18 @@ void printChar(char thisChar){
 }
 
 /* Writes char array to buffer */
-void bufWrite(char* buf,long startIndex,char* data,long length){
-	long i;
+void bufWrite(char* buf,uint32_t startIndex,char* data,uint32_t length){
+	uint32_t i;
 	for(i=0;i<length;i++){
 		buf[startIndex+i] = data[i];
-		printf("%c",data[i]);
+		
 	}
 	return;
 }
 
 /* Small endian to big */
-long toBigEndian(char* charArray, int numBytes){
-	int i,total;
+uint32_t toBigEndian(char* charArray, uint32_t numBytes){
+	uint32_t i,total;
 	total=0;
 	for(i=0;i<numBytes;i++){
 		total = total*256 + (unsigned char) charArray[i];
@@ -125,8 +125,8 @@ char* toSmallEndian(char* num, int numBytes){
 
 /* Returns the maximum byte number needed for
    the dot-underscore file. */
-long sizeNeeded(struct DotU dotU){
-	long max=0;
+uint32_t sizeNeeded(struct DotU dotU){
+	uint32_t max=0;
 	int i;
 	for(i=0;i<dotU.header.numEntries;i++){
 		if(dotU.entry[i].offset+dotU.entry[i].length>max){
@@ -140,15 +140,15 @@ long sizeNeeded(struct DotU dotU){
 
 /* Returns the header size */
 /* TODO: I think there's a bug in here... */
-long attrHdrSize(long nameLength){
+uint32_t attrHdrSize(uint32_t nameLength){
 	/* 4 bytes each for value offset, value length, 
 	   2 bytes for flags, 1 bytes for name length
 	 Plus the number of bytes in the name
-	 Plus 1 for being null-terminated
+	 *** NOT Plus 1 for being null-terminated   *** Name length includes the \0.
 	 Then round up to the nearest word boundary because
 	 of course mem reads are faster that way... */
-	long bitFilter = 3L;
-	return ((sizeof(char)*(11+(long)nameLength+1) + bitFilter) & ~bitFilter);
+	uint32_t bitFilter = 3L;
+	return ((sizeof(char)*(11+(uint32_t)nameLength /* +1 */) + bitFilter) & ~bitFilter);
 }
 
 
@@ -158,24 +158,24 @@ long attrHdrSize(long nameLength){
 
 struct DotU readDotUFile(const char *fileName){
 	struct stat statBuffer;
-	int i;
-	int entryCount,dotUOffset;
+	uint32_t i;
+	uint32_t entryCount,dotUOffset;
 	int fileDescriptor;
 	char *data;
 	FILE *dotUFile;
 	char *dotUBuffer;
 	char readChar;
-	long fileLength;
+	uint32_t fileLength;
 	
 	struct DotU dotU;
 	struct ExtAttr *attrs;
 	char *entryName;
 	char *entryValue;
-	long charNum;
+	uint32_t charNum;
 	uint8_t entryNameLength;
-	long entryValueLength;
-	long entryHeaderOffset;
-	long entryValueOffset;
+	uint32_t entryValueLength;
+	uint32_t entryHeaderOffset;
+	uint32_t entryValueOffset;
 	char attrFlags[2];
 
 	/* Note: Using fstat() to obtain size based on advice from
@@ -201,7 +201,8 @@ struct DotU readDotUFile(const char *fileName){
 	}
 	
 	fileLength = statBuffer.st_size;
-	dotUBuffer = (char*)malloc(fileLength);
+	dotUBuffer = (char*)malloc(sizeof(char)*fileLength);
+	printf("Creating buffer of size: %li\n",fileLength);
 	if(dotUBuffer==NULL){
 		/* TODO: handle error */
 		printf("Error allocating dot underscore file buffer.\n");
@@ -209,7 +210,7 @@ struct DotU readDotUFile(const char *fileName){
 	
 	printf("Reading File\n"); /* DEBUG PRINT */
 
-	for (i = 0; (readChar = getc(dotUFile)) != EOF && i < fileLength; dotUBuffer[i++] = readChar) printChar(readChar);
+	for (i = 0; (readChar = getc(dotUFile)) != EOF && i < fileLength; dotUBuffer[i++] = readChar) /* DEBUG ONLY */ printChar(readChar) ;
 	fclose(dotUFile);
 	
 	/* Fill dotU struct */
@@ -277,15 +278,17 @@ struct DotU readDotUFile(const char *fileName){
 					}
 					entryNameLength  = dotUBuffer[entryHeaderOffset+10];
 					
-					entryName=malloc(sizeof(char)*entryNameLength+1);
+					/* Entry name length includes \0, but entry value length does not. */
+					entryName=malloc(sizeof(char)*entryNameLength /* +1 */);
 					entryValue=malloc(sizeof(char)*entryValueLength+1);
 					
 					for(charNum=0;charNum<=entryNameLength;charNum++){
 						entryName[charNum]=dotUBuffer[entryHeaderOffset+11+charNum];
 					}
-					entryName[entryNameLength]='\0';
+					/*entryName[entryNameLength]='\0';  Uneeded - see above*/
 					for(charNum=0;charNum<=entryValueLength;charNum++){
 						entryValue[charNum]=dotUBuffer[entryValueOffset+charNum];
+						printf("-%li-*%c*",entryValueOffset+charNum,entryValue[charNum]);
 					}
 					entryValue[entryValueLength]='\0';
 					
@@ -320,10 +323,10 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	char *prefix = "-t0";
 	char *fileBuffer;
 	FILE *dotUFile;
-	long i,j;
+	uint32_t i,j;
 		uint32_t k;
-	long bufferSize;
-	long bufIndex;
+	uint32_t bufferSize;
+	uint32_t bufIndex;
 	
 	bufferSize = sizeNeeded(dotU);
 	fileBuffer=(char *)malloc(sizeof(char)*bufferSize);
@@ -418,18 +421,18 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 							bufWrite(fileBuffer,bufIndex+11,dotU.entry[i].data.finder.attr[j].name,dotU.entry[i].data.finder.attr[j].nameLength);
 				
 
-	printf("\nBuffer is: Writing at buf index: %li\n",bufIndex+11);
 
+	/*printf("\nBuffer is: Writing at buf index: %li\n",bufIndex+11);
 	for(k=0;k<bufferSize;k++) printChar(fileBuffer[k]);
+*/
 
-
-							printf("%s\n",dotU.entry[i].data.finder.attr[j].name);
+							/*printf("%s\n",dotU.entry[i].data.finder.attr[j].name);
 							/* Write the value of the attr */
 							bufWrite(fileBuffer,dotU.entry[i].data.finder.attr[j].valueOffset,dotU.entry[i].data.finder.attr[j].value, dotU.entry[i].data.finder.attr[j].valueLength);
 							
-	printf("\nBuffer is: Writing at buf index: %u\n",dotU.entry[i].data.finder.attr[j].valueOffset);
+/*	printf("\nBuffer is: Writing at buf index: %u\n",dotU.entry[i].data.finder.attr[j].valueOffset);
 	for(k=0;k<bufferSize;k++) printChar(fileBuffer[k]);
-
+*/
 							bufIndex+=attrHdrSize(dotU.entry[i].data.finder.attr[j].nameLength);
 
 					}
@@ -448,8 +451,11 @@ int createDotUFile(struct DotU dotU, const char * parentFileName){
 	/* Last 2 bytes should be EOF */
 	for(i=1;i<=2;i++) fileBuffer[bufferSize-i]=EOF;
 	
+	/* For debugging - delete or leave commented forever.
 	printf("\nBuffer is:\n");
 	for(i=0;i<bufferSize;i++) printChar(fileBuffer[i]);
+	*/
+	
 	
 		
 	
