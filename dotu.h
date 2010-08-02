@@ -164,7 +164,7 @@ struct DotU readDotUFile(const char *fileName){
 	char *data;
 	FILE *dotUFile;
 	char *dotUBuffer;
-	char readChar;
+	int readChar;
 	uint32_t fileLength;
 	
 	struct DotU dotU;
@@ -286,9 +286,8 @@ struct DotU readDotUFile(const char *fileName){
 						entryName[charNum]=dotUBuffer[entryHeaderOffset+11+charNum];
 					}
 					/*entryName[entryNameLength]='\0';  Uneeded - see above*/
-					for(charNum=0;charNum<=entryValueLength;charNum++){
+					for(charNum=0;charNum<entryValueLength;charNum++){
 						entryValue[charNum]=dotUBuffer[entryValueOffset+charNum];
-						printf("-%li-*%c*",entryValueOffset+charNum,entryValue[charNum]);
 					}
 					entryValue[entryValueLength]='\0';
 					
