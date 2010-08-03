@@ -4,8 +4,8 @@ DIFF = cmp -bl
 
 all: dotU
 
-dotU: dotU.c
-	$(CC) $(STRICT) dotU.c -o dotU
+dotU: dotU.c test.c
+	$(CC) $(STRICT) test.c dotU.c -o dotU
 
 test: dotU
 	./dotU test/dotu-f1 > test/dotu-f1-out
