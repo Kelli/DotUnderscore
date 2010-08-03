@@ -415,17 +415,27 @@ setOffsets(struct DotU dotU){
 	and numAttrs
 	
 	*/
+	
+	/* Add up all of the xattr value lengths
+	   Add up all of the header sizes of all of the xattr names
+	   Calculate size of finder info
+	*/
+	/* TODO */
+	
+	
 }
 
 /* Add in a new extended attribute.  Return 0 if good, -1 if fail */
 int 
 addAttr(const char * name, const char * value){
+		/* TODO */
 	return 0;
 }
 
 /* Remove an extended attribute.  Return 0 if good, -1 if fail */
 int 
 rmAttr(const char * name){
+		/* TODO */
 	return 0;
 }
 
