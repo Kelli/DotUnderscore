@@ -88,11 +88,26 @@ int main(int argc, char *argv[]){
 
 
 	printf("\n\nTesting create-a-dotU:\n");
-	if(createDotUFile(myDotU,argv[1])!=0){
+	if(createDotUFile(myDotU,argv[1],"-t0")!=0){
 		printf("\nError creating ._ file!\n");
 	} else {
 		printf("Done!");
 	}
+	
+	
+	
+	printf("\n\nTesting creating a dotU with calculating the offsets first.\n");
+	if(setOffsets(myDotU)!=0){
+		printf("\nError calculating offsets!\n");
+	} else {
+		printf("Done calculating!");
+	}
+	if(createDotUFile(myDotU,argv[1],"-t1")!=0){
+		printf("\nError creating ._ file!\n");
+	} else {
+		printf("Done creating file!");
+	}
+	
 	
 
 	printf("\nGoodbye.\n");

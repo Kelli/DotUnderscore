@@ -56,6 +56,12 @@ sizeNeeded(struct DotU dotU){
 	return max;
 }
 
+/* Rounds up to nearest 4096 - dotU file size */
+uint32_t roundup4096(uint32_t size){
+	uint32_t bitFilter = 4095L;
+	return (size + bitFilter) & ~bitFilter;
+}
+
 
 /* Returns the header size */
 uint32_t 
@@ -69,11 +75,6 @@ attrHdrSize(uint32_t nameLength){
 	uint32_t bitFilter = 3L;
 	return ((sizeof(char)*(11+(uint32_t)nameLength /* +1 */) + bitFilter) & ~bitFilter);
 }
-
-
-
-
-
 
 struct DotU 
 readDotUFile(const char *fileName){
@@ -238,9 +239,8 @@ readDotUFile(const char *fileName){
 } 
 
 int 
-createDotUFile(struct DotU dotU, const char * parentFileName){
+createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffix){
 	char *dotUFileName;
-	char *prefix = "-t0";
 	char *fileBuffer;
 	FILE *dotUFile;
 	uint32_t i,j;
@@ -381,13 +381,13 @@ createDotUFile(struct DotU dotU, const char * parentFileName){
 	
 	printf("\nAllocating filename for ._\n");
 	printf("Parent file name is %s and is %i characters long.\n",parentFileName,(int)strlen(parentFileName));
-	dotUFileName=(char*)malloc(sizeof(char) * (strlen(parentFileName)+strlen(prefix)));
+	dotUFileName=(char*)malloc(sizeof(char) * (strlen(parentFileName)+strlen(suffix)));
 	/*strcpy(dotUFileName,prefix); */
 	strcpy(dotUFileName,parentFileName);
 	/* TODO: Max file name size? */
 	/*dotUFileName=strncat(dotUFileName,parentFileName,(strlen(parentFileName)+strlen(prefix)));*/
-	dotUFileName=strncat(dotUFileName,prefix,(strlen(parentFileName)+strlen(prefix)));
-	printf("Child file name is %s %s %s and is %i characters long.\n",prefix,parentFileName,dotUFileName,(int) (strlen(parentFileName)+strlen(prefix)));
+	dotUFileName=strncat(dotUFileName,suffix,(strlen(parentFileName)+strlen(suffix)));
+	printf("Child file name is %s %s %s and is %i characters long.\n",suffix,parentFileName,dotUFileName,(int) (strlen(parentFileName)+strlen(suffix)));
 	
 	printf("Output file: %s\n",dotUFileName);
 	
@@ -401,6 +401,9 @@ createDotUFile(struct DotU dotU, const char * parentFileName){
 
 int 
 setOffsets(struct DotU dotU){
+	uint32_t i,j;
+	uint32_t currentValueOffset,currentNameOffset;
+	uint32_t sizeNeeded, sizeResource, sizeFinder;
 	/* 
 	Set dotU entry  (resource, finder)
 		offsets
@@ -420,9 +423,81 @@ setOffsets(struct DotU dotU){
 	   Add up all of the header sizes of all of the xattr names
 	   Calculate size of finder info
 	*/
-	/* TODO */
+	
+	/* dot U file size is a multiple of 4096 bytes */
+	/* Resource fork starts at (total file size - resource size) */
+	for(i=0;i<dotU.header.numEntries;i++){
+		switch(dotU.entry[i].id){
+			case 2:{
+				/* Resource fork */
+				dotU.entry[i].offset=0;
+			}break;
+			case 9:{
+				/* Finder info - xattrs live here */
+				/* Baseline the xattr values */
+				currentValueOffset = 0;
+				for(j=0;j<dotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
+					dotU.entry[i].data.finder.attr[j].valueOffset = currentValueOffset;
+					currentValueOffset+=dotU.entry[i].data.finder.attr[j].valueLength;
+				}
+				/* Now we have the total length of the xattr data */
+				dotU.entry[i].data.finder.xattrHdr.attrDataLength = currentValueOffset;
+				
+				/* Get the size of the xattr names */
+				currentNameOffset=0;
+				for(j=0;j<dotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
+					currentNameOffset+=attrHdrSize(dotU.entry[i].data.finder.attr[j].nameLength);
+				}
+				
+
+				
+					/* Names of xattrs start at byte #120 
+					50 bytes of dotU header + entries
+					70 bytes of Finder Info header   */
+				currentValueOffset=currentNameOffset+120;
+				/* Add the right offset ot all of the xattr values */
+				for(j=0;j<dotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
+					dotU.entry[i].data.finder.attr[j].valueOffset += currentValueOffset;
+				}
+				
+				/* Set the offset for the finder info - first entry */
+				dotU.entry[i].offset=50;
+				
+				}break;
+			default:{
+				/* Unknown dotU entry */
+				printf("Unknown entry id in list.\n");
+			}break;
+			
+		}
+	}
+
+	/* 50 bytes of dotU header + entry list */
+	sizeNeeded = roundup4096(sizeResource + sizeFinder + 50);
 	
 	
+
+	for(i=0;i<dotU.header.numEntries;i++){
+		switch(dotU.entry[i].id){
+			case 2:{
+				/* Resource fork */
+				dotU.entry[i].offset = sizeNeeded - sizeResource;
+			}break;
+			case 9:{
+				/* Finder Info */
+				dotU.entry[i].offset = 120;
+				/* Set the size of the finder entry 
+				   Total size of file minus the resource and minus the 
+				   dotU header and entry list */
+				dotU.entry[i].length = sizeNeeded - sizeResource - 50;
+			}break;
+			default:{
+				printf("Unknown entry id.\n");
+			}break;
+		}
+	}
+	
+	return 0;
 }
 
 /* Add in a new extended attribute.  Return 0 if good, -1 if fail */

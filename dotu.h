@@ -97,11 +97,13 @@ char* toSmallEndian(char* num, uint32_t numBytes);
    the dot-underscore file. */
 uint32_t sizeNeeded(struct DotU dotU);
 
+uint32_t roundup4096(uint32_t size);
+
 uint32_t attrHdrSize(uint32_t nameLength);
 
 struct DotU readDotUFile(const char *fileName);
 
-int createDotUFile(struct DotU dotU, const char * parentFileName);
+int createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffix);
 
 int setOffsets(struct DotU dotU);
 
