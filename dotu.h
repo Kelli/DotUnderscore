@@ -105,16 +105,19 @@ struct DotU readDotUFile(const char *fileName);
 
 int createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffix);
 
-int setOffsets(struct DotU dotU);
+int setOffsets(struct DotU *);
 
-int addAttr(const char * name, const char * value);
+int addAttr(struct DotU * dotU, const char * name, const char * value);
 
 /* Remove an extended attribute.  Return 0 if good, -1 if fail */
-int rmAttr(const char * name);
+int rmAttr(struct DotU * dotU, const char * name);
 
-char* getAttrValue(const char * name);
+char* getAttrValue(struct DotU dotU, const char * name);
 
+int getAttrIndex(struct DotU dotU, const char * name);
 
+int getFinderInfoEntry(struct DotU dotU);
 
+void listAttrs(struct DotU dotU);
 
 #endif

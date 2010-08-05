@@ -86,7 +86,7 @@ int main(int argc, char *argv[]){
 	
 	}
 
-
+	/* Test the create file method */
 	printf("\n\nTesting create-a-dotU:\n");
 	if(createDotUFile(myDotU,argv[1],"-t0")!=0){
 		printf("\nError creating ._ file!\n");
@@ -95,9 +95,9 @@ int main(int argc, char *argv[]){
 	}
 	
 	
-	
+	/* Test the calculations of the offsets */
 	printf("\n\nTesting creating a dotU with calculating the offsets first.\n");
-	if(setOffsets(myDotU)!=0){
+	if(setOffsets(&myDotU)!=0){
 		printf("\nError calculating offsets!\n");
 	} else {
 		printf("Done calculating!");
@@ -107,6 +107,41 @@ int main(int argc, char *argv[]){
 	} else {
 		printf("Done creating file!");
 	}
+	
+	
+	/* Test adding an xattr */
+	printf("\n\nTesting adding an xattr to file.\n");
+	if(addAttr(&myDotU,"test1","value1")!=0){
+		printf("Error adding xattr\n");
+	} else {
+		printf("Added xattr\n");
+	}
+	if(createDotUFile(myDotU,argv[1],"-t2")!=0){
+		printf("\nError creating ._ file!\n");
+	} else {
+		printf("Done creating file!");
+	}
+	
+	/* Test adding an xattr value to an xattr that already exists */
+	printf("\n\nTesting adding an xattr to file.\n");
+	if(addAttr(&myDotU,"test1","value1-B")!=0){
+		printf("Error adding xattr\n");
+	} else {
+		printf("Added xattr\n");
+	}
+	printf("Index of new attr is: %i\n",getAttrIndex(myDotU,"test1"));
+	printf("Index of finder entry is: %i\n",getFinderInfoEntry(myDotU));
+	
+	
+	
+	
+	if(createDotUFile(myDotU,argv[1],"-t3")!=0){
+		printf("\nError creating ._ file!\n");
+	} else {
+		printf("Done creating file!");
+	}
+	
+	
 	
 	
 
