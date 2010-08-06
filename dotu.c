@@ -520,7 +520,7 @@ addAttr(struct DotU *dotU, const char * name, const char * value){
 	int index,finderEntry;
 	uint32_t attrNum;
 	struct ExtAttr* attrs;
-	int found;
+	int cmpString;
 	int charNum;
 	
 	/* TODO - make sure there's room - if not, what happens? */
@@ -543,47 +543,79 @@ addAttr(struct DotU *dotU, const char * name, const char * value){
 		printf("Creating attr %s\n",name);
 		(*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs++;
 		attrs=(struct ExtAttr*)malloc(sizeof(struct ExtAttr) * (*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs);
-		for(attrNum=0;attrNum<(*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs-1;attrNum++){
-			found = (strcmp((*dotU).entry[finderEntry].data.finder.attr[attrNum].value,value)==0);
-			switch(strcmp((*dotU).entry[finderEntry].data.finder.attr[attrNum].value,value)<0){
-				case -1:
-					attrs[attrNum]=(*dotU).entry[finderEntry].data.finder.attr[attrNum];
-					break;
-				case 0:	
-					/* Entry name length includes \0, but entry value length does not. */
-					attrs[attrNum].name=malloc(sizeof(char)*strlen(name)+1);
-					attrs[attrNum].nameLength=strlen(name)+1;
-					printf("Index of attr %s is %i\n",name,attrNum);
-					index=attrNum;
-					strcpy(attrs[attrNum].name,name);
-					printf("Index of attr %s is %i\n",attrs[attrNum].name,attrNum);
-					/* Set flags to 0's */
-					for(charNum=0;charNum<2;charNum++) attrs[attrNum].flags[charNum]=0;
-					break;
-				case 1:
-					attrs[attrNum+1]=(*dotU).entry[finderEntry].data.finder.attr[attrNum];
-					break;
+		attrNum=0;
+		while(index<0 && attrNum<(*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs-1){
+			cmpString = strcmp((*dotU).entry[finderEntry].data.finder.attr[attrNum].name,name);
+			printf("The strcmp value is %i\n",cmpString);
+			if(cmpString<0 && index<0)
+			{
+				/* Alphabetically before the new xattr */
+				printf("Not there yet - addxattr\n");
+				attrs[attrNum].name=malloc(sizeof(char)*strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].name)+1);
+				strcpy(attrs[attrNum].name,(*dotU).entry[finderEntry].data.finder.attr[attrNum].name);
+				attrs[attrNum].value=malloc(sizeof(char)*strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].value)+1);
+				strcpy(attrs[attrNum].value,(*dotU).entry[finderEntry].data.finder.attr[attrNum].value);
+				attrs[attrNum].nameLength=strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].name)+1;
+				attrs[attrNum].valueLength=strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].value);
+				for(charNum=0;charNum<2;charNum++) attrs[attrNum].flags[charNum]=(*dotU).entry[finderEntry].data.finder.attr[attrNum].flags[charNum];
+				printf("Listing %s %s\n",attrs[attrNum].name,attrs[attrNum].value);
+				
+				
+				attrNum++;
+				
+			} else {
+				index = attrNum;
 			}
 		}
-	
+		/* Insert here */
+		printf("This is the one - addxattr\n");
+		attrs[attrNum].name=malloc(sizeof(char)*strlen(name)+1);
+		strcpy(attrs[attrNum].name,name);
+		attrs[attrNum].value=malloc(sizeof(char)*strlen(value)+1);		
+		strcpy(attrs[attrNum].value,value);
+		/* Entry name length includes \0, but entry value length does not. */
+		attrs[attrNum].nameLength=strlen(name)+1;
+		attrs[attrNum].valueLength=strlen(value);
+		index=attrNum;
+		printf("Adding in %s %s\n",attrs[attrNum].name,attrs[attrNum].value);
+		printf("Index of attr %s is %i\n",attrs[attrNum].name,attrNum);
+		/* Set flags to 0's */
+		for(charNum=0;charNum<2;charNum++) attrs[attrNum].flags[charNum]=0;		
+		attrNum++;
+		
+		/* Finish off the array */
+		while(attrNum<(*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs){
+			printf("Finishing up xattr list - addxattr\n");
+			attrs[attrNum]=(*dotU).entry[finderEntry].data.finder.attr[attrNum-1];
+			/* Keep alphabetical order after the new xattr */
+			attrs[attrNum].name=malloc(sizeof(char)*strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum-1].name)+1);
+			strcpy(attrs[attrNum].name,(*dotU).entry[finderEntry].data.finder.attr[attrNum-1].name);
+			attrs[attrNum].value=malloc(sizeof(char)*strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum-1].value)+1);
+			strcpy(attrs[attrNum].value,(*dotU).entry[finderEntry].data.finder.attr[attrNum-1].value);
+			attrs[attrNum].nameLength=strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum-1].name)+1;
+			attrs[attrNum].valueLength=strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum-1].value);
+			/* Set flags to 0's */
+			for(charNum=0;charNum<2;charNum++) attrs[attrNum].flags[charNum]=(*dotU).entry[finderEntry].data.finder.attr[attrNum-1].flags[charNum];
+			printf("Listing %s %s\n",attrs[attrNum].name,attrs[attrNum].value);
+				
+			attrNum++;
+		}
+		
+		/* List all values - debug */
+		for(attrNum=0;attrNum<(*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs;attrNum++){
+			printf("Attr %s : %s\n",attrs[attrNum].name,attrs[attrNum].value);
+		}
 		printf("Setting attr list\n");
 		/* set attrs in dotU */
-		(*dotU).entry[finderEntry].data.finder.attr=attrs;
+		/*free((*dotU).entry[finderEntry].data.finder.attr);
+		printf("Freed mem\n");*/
+		(*dotU).entry[finderEntry].data.finder.attr=attrs;	
+		printf("Set attr ptr");
 		printf("New attr is %s \n",(*dotU).entry[finderEntry].data.finder.attr[index].name);
 					
 		printf("Done Setting attr list\n");
 	}
 	
-	/* value and its length */
-	(*dotU).entry[finderEntry].data.finder.attr[index].value=malloc(sizeof(char)*strlen(value)+1);
-	printf("Set space for value %s\n",value);
-	strcpy((*dotU).entry[finderEntry].data.finder.attr[index].value, value);
-	printf("Strcpy done for value %s\n",(*dotU).entry[finderEntry].data.finder.attr[index].value);
-	/* Entry name length includes \0, but entry value length does not. */
-	(*dotU).entry[finderEntry].data.finder.attr[index].valueLength = strlen(value);
-	printf("Value length is %i\n",strlen(value));
-	printf(" is %s\n",(*dotU).entry[finderEntry].data.finder.attr[index].value);
-	printf("New attr %s ",(*dotU).entry[finderEntry].data.finder.attr[index].name);
 	
 	printf("New attr %s is %s\n",(*dotU).entry[finderEntry].data.finder.attr[index].name,(*dotU).entry[finderEntry].data.finder.attr[index].value);
 	
@@ -617,20 +649,25 @@ int
 getAttrIndex(struct DotU dotU, const char * name){
 	int i;
 	int finderEntry = getFinderInfoEntry(dotU);
+	printf("Looking for %s\n",name);
 	if(finderEntry<0){
 		printf("Cannot find FinderInfo, so cannot locate xattr.\n");
 		return -1;
 	}
 	
 	for(i=0;i<dotU.entry[finderEntry].data.finder.xattrHdr.numAttrs;i++){
-		switch(strcmp(dotU.entry[finderEntry].data.finder.attr[i].name,name)){
-			case -1:  break;
-			case 0:   return i;  break;
-			case 1:   return -1;  break;
-		} 
+		printf("Comparing %s and %s\n",dotU.entry[finderEntry].data.finder.attr[i].name,name);
+		printf("Strcmp returns %i\n",strcmp(dotU.entry[finderEntry].data.finder.attr[i].name,name));
+		if(strcmp(dotU.entry[finderEntry].data.finder.attr[i].name,name)<0){
+			printf("Not there yet.\n");
+		} else if(strcmp(dotU.entry[finderEntry].data.finder.attr[i].name,name)==0){
+			printf("Match!\n"); return i;  
+		} else {
+			printf("Too far.\n"); return -1; 
+		}
 		
 	}	
-	
+	printf("Couldn't find %s in attr list.\n",name);
 	return -1;
 }
 
