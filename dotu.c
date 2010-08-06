@@ -354,7 +354,7 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 	for(k=0;k<bufferSize;k++) printChar(fileBuffer[k]);
 */
 
-							/*printf("%s\n",dotU.entry[i].data.finder.attr[j].name);
+							printf("%s : %s at %u : %u\n",dotU.entry[i].data.finder.attr[j].name,dotU.entry[i].data.finder.attr[j].value,bufIndex+10,dotU.entry[i].data.finder.attr[j].valueOffset);
 							/* Write the value of the attr */
 							bufWrite(fileBuffer,dotU.entry[i].data.finder.attr[j].valueOffset,dotU.entry[i].data.finder.attr[j].value, dotU.entry[i].data.finder.attr[j].valueLength);
 							
@@ -440,24 +440,26 @@ setOffsets(struct DotU *dotU){
 			case 2:{
 				/* Resource fork */
 				(*dotU).entry[i].offset=0;
+				sizeResource = (*dotU).entry[i].length;
 			}break;
 			case 9:{
 				/* Finder info - xattrs live here */
 				/* Baseline the xattr values */
 				currentValueOffset = 0;
+				currentNameOffset=0;
 				for(j=0;j<(*dotU).entry[i].data.finder.xattrHdr.numAttrs;j++){
 					(*dotU).entry[i].data.finder.attr[j].valueOffset = currentValueOffset;
 					currentValueOffset+=(*dotU).entry[i].data.finder.attr[j].valueLength;
+				
+				/* Get the size of the xattr names */
+					currentNameOffset+=attrHdrSize((*dotU).entry[i].data.finder.attr[j].nameLength);
+				
 				}
 				/* Now we have the total length of the xattr data */
 				(*dotU).entry[i].data.finder.xattrHdr.attrDataLength = currentValueOffset;
-				
-				/* Get the size of the xattr names */
-				currentNameOffset=0;
-				for(j=0;j<(*dotU).entry[i].data.finder.xattrHdr.numAttrs;j++){
-					currentNameOffset+=attrHdrSize((*dotU).entry[i].data.finder.attr[j].nameLength);
-				}
-				
+				printf("Attrs data length is %li\n",(*dotU).entry[i].data.finder.xattrHdr.attrDataLength);
+				printf("Attrs header length is %li\n",currentNameOffset);
+				listAttrs(*dotU);
 
 				
 					/* Names of xattrs start at byte #120 
@@ -468,10 +470,9 @@ setOffsets(struct DotU *dotU){
 				for(j=0;j<(*dotU).entry[i].data.finder.xattrHdr.numAttrs;j++){
 					(*dotU).entry[i].data.finder.attr[j].valueOffset += currentValueOffset;
 				}
-				
-				/* Set the offset for the finder info - first entry */
-				(*dotU).entry[i].offset=50;
-				
+				sizeFinder = (*dotU).entry[i].data.finder.attr[(*dotU).entry[i].data.finder.xattrHdr.numAttrs-1].valueOffset + (*dotU).entry[i].data.finder.attr[j].valueLength;
+
+
 				}break;
 			default:{
 				/* Unknown dotU entry */
@@ -483,7 +484,7 @@ setOffsets(struct DotU *dotU){
 
 	/* 50 bytes of dotU header + entry list */
 	sizeNeeded = roundup4096(sizeResource + sizeFinder + 50);
-	
+	printf("Total ._ file size will be %u + %u + 50 = %u\n",sizeResource, sizeFinder, sizeNeeded);
 	
 
 	for(i=0;i<(*dotU).header.numEntries;i++){
@@ -494,7 +495,11 @@ setOffsets(struct DotU *dotU){
 			}break;
 			case 9:{
 				/* Finder Info */
-				(*dotU).entry[i].offset = 120;
+				/* Set the offset for the finder info - first entry */
+				/* Finder Info is always 50 bytes from start of file */
+				/* DotU header + Entry list = 50 bytes. Finder info follows. */
+				(*dotU).entry[i].offset=50;
+				
 				/* Set the size of the finder entry 
 				   Total size of file minus the resource and minus the 
 				   dotU header and entry list */
@@ -517,14 +522,9 @@ addAttr(struct DotU *dotU, const char * name, const char * value){
 	struct ExtAttr* attrs;
 	int found;
 	int charNum;
-
-					
 	
 	/* TODO - make sure there's room - if not, what happens? */
-	
-	
-	
-	
+
 	/* Check to see if it's a new attr name.  If not, 
 	   just rewrite the existing value and update
 	   the value length. */
@@ -651,5 +651,6 @@ void listAttrs(struct DotU dotU){
 	for(j=0;j<dotU.entry[finderEntry].data.finder.xattrHdr.numAttrs;j++){
 		printf("\n\t\t\tAttr #%i : %s : %s",j,dotU.entry[finderEntry].data.finder.attr[j].name,dotU.entry[finderEntry].data.finder.attr[j].value);
 	}
+	printf("\n");
 	return;
 }
