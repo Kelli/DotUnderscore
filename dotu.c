@@ -375,7 +375,7 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 	/* Last 2 bytes should be EOF */
 	for(i=1;i<=2;i++) fileBuffer[bufferSize-i]=EOF;
 	
-	/* For debugging - delete or leave commented forever.
+	/* For debugging - delete or leave commented forever.  It's a dump of the whole buffer.
 	printf("\nBuffer is:\n");
 	for(i=0;i<bufferSize;i++) printChar(fileBuffer[i]);
 	*/
@@ -407,7 +407,9 @@ int
 setOffsets(struct DotU *dotU){
 	uint32_t i,j;
 	uint32_t currentValueOffset,currentNameOffset;
-	uint32_t sizeNeeded, sizeResource, sizeFinder;
+	uint32_t sizeNeeded;
+	uint32_t sizeResource = 0;
+	uint32_t sizeFinder = 0;
 	/* 
 	Set dotU entry  (resource, finder)
 		offsets
