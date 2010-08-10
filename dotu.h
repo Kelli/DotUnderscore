@@ -23,14 +23,14 @@
 
 
 struct DotUHeader {
-	char magic[4];
+	uint32_t magic;
 	uint32_t versionNum;
 	char homeFileSystem[16];
 	uint16_t numEntries;
 };
 
 struct ExtAttrHeader{
-	char headerMagic[4];
+	uint32_t headerMagic;
 	uint32_t debugTag;
 	uint32_t size;
 	uint32_t attrDataOffset;
@@ -105,7 +105,7 @@ struct DotU readDotUFile(const char *fileName);
 
 int createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffix);
 
-int setOffsets(struct DotU *);
+int setOffsets(struct DotU * dotU);
 
 int addAttr(struct DotU * dotU, const char * name, const char * value);
 
@@ -119,5 +119,9 @@ int getAttrIndex(struct DotU dotU, const char * name);
 int getFinderInfoEntry(struct DotU dotU);
 
 void listAttrs(struct DotU dotU);
+
+void printDotUDetail(struct DotU dotU);
+
+struct DotU iniDotU(const char * parentFileName);
 
 #endif

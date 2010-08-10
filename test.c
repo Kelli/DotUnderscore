@@ -18,6 +18,8 @@
 int main(int argc, char *argv[]){
 	struct DotU myDotU;
 	int i,j;
+	long ok=0;
+	long nok=0;
 	
 	if(argc!=2){
 		printf("Usage: %s filename\n",argv[0]);
@@ -29,116 +31,149 @@ int main(int argc, char *argv[]){
 
 	/* Initializing DotU struct with data from file*/
 	myDotU = readDotUFile(argv[1]);
+	printDotUDetail(myDotU);
 
-
 	
 	
-	/* Printing details of DotU Object */
-	printf("\nFile Magic Number: ");
-		for(j=0;j<4;j++) printChar(myDotU.header.magic[j]);
-	printf("\nFile Version Number: 0x%.8x",myDotU.header.versionNum);
-	printf("\nFile Home File System: %16s",myDotU.header.homeFileSystem);
-	printf("\nFile Number of entries: %i",myDotU.header.numEntries);
-	
-
-	for(i=0;i<myDotU.header.numEntries;i++){
-		printf("\nEntry ID: %i",myDotU.entry[i].id);
-		printf("\n\tEntry Offset: %i", myDotU.entry[i].offset);
-		printf("\n\tEntry Length: %i", myDotU.entry[i].length);
-		
-		switch(myDotU.entry[i].id){
-			case 2:{
-				printf("\n\tResource Fork.");
-				/* Shows data in the resource fork */
-				printf("\n\t\tData: ");
-				for(j=0;j<myDotU.entry[i].length;j++)printChar(myDotU.entry[i].data.resource.data[j]);
-			}break;
-			case 9:{
-				printf("\n\tFinder Info.");
-				printf("\n\tFirst 32 bytes reserved by FinderInfo (16 header, 16 extended): ");
-					for(j=0;j<32;j++) printChar(myDotU.entry[i].data.finder.finderHeader[j]);
-				printf("\n\tPadding (16 bits): ");
-					for(j=0;j<2;j++) printChar(myDotU.entry[i].data.finder.padding[j]);				
-				printf("\n\tExt Attr Header:");
-				printf("\n\t\tAttr Header Magic: ");
-					for(j=0;j<4;j++) printChar(myDotU.entry[i].data.finder.xattrHdr.headerMagic[j]);				
-				printf("\n\t\tAttr Header Debug tag: %.8x",myDotU.entry[i].data.finder.xattrHdr.debugTag);
-				printf("\n\t\tAttr Header Total Size: %i",myDotU.entry[i].data.finder.xattrHdr.size);
-				printf("\n\t\tAttr Header Data Start: %i",myDotU.entry[i].data.finder.xattrHdr.attrDataOffset);
-				printf("\n\t\tAttr Header Data Length: %i",myDotU.entry[i].data.finder.xattrHdr.attrDataLength);
-				printf("\n\t\tAttr Header Reserved: ");
-					for(j=0;j<12;j++) printChar(myDotU.entry[i].data.finder.xattrHdr.attrReserved[j]);				
-				printf("\n\t\tAttr Header Flags: ");
-					for(j=0;j<2;j++) printChar(myDotU.entry[i].data.finder.xattrHdr.attrFlags[j]);				
-				printf("\n\t\tAttr Header Num Attrs: %i",myDotU.entry[i].data.finder.xattrHdr.numAttrs);
-				
-				for(j=0;j<myDotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
-					printf("\n\t\t\tAttr #%i : %s : %s",j,myDotU.entry[i].data.finder.attr[j].name,myDotU.entry[i].data.finder.attr[j].value);
-				}
-				
-				
-			}break;
-			default: {
-				printf("\nUnknown Entry Type.\n");
-			}break;
-			
-		}
-	
-	}
 
 	/* Test the create file method */
-	printf("\n\nTesting create-a-dotU:\n");
 	if(createDotUFile(myDotU,argv[1],"-t0")!=0){
-		printf("\nError creating ._ file!\n");
+		printf("NOK - Error creating DotU File from struct.\n");
+		nok++;
 	} else {
-		printf("Done!");
+		printf("OK - Created DotU File from struct.\n");
+		ok++;
 	}
 	
 	
 	/* Test the calculations of the offsets */
-	printf("\n\nTesting creating a dotU with calculating the offsets first.\n");
 	if(setOffsets(&myDotU)!=0){
-		printf("\nError calculating offsets!\n");
+		printf("NOK - Error calculating offsets for dotU struct!\n");
+		nok++;
 	} else {
-		printf("Done calculating!");
+		printf("OK - Done calculating offsets for dotU struct!\n");
+		ok++;
 	}
+	/* Create file to compare to previous - should match. */
 	if(createDotUFile(myDotU,argv[1],"-t1")!=0){
-		printf("\nError creating ._ file!\n");
+		printf("NOK - Error creating DotU File from struct.\n");
+		nok++;
 	} else {
-		printf("Done creating file!");
+		printf("OK - Created DotU File from struct.\n");
+		ok++;
 	}
 	
 	
 	/* Test adding an xattr */
-	printf("\n\nTesting adding an xattr to file.\n");
 	if(addAttr(&myDotU,"test1","value1")!=0){
-		printf("Error adding xattr\n");
+		printf("NOK - Error adding new xattr.\n");
+		nok++;
 	} else {
-		printf("Added xattr\n");
+		printf("OK - Added new xattr.\n");
+		ok++;
 	}
+	/* Create file to compare to previous - should match except for new xattr. */
 	if(createDotUFile(myDotU,argv[1],"-t2")!=0){
-		printf("\nError creating ._ file!\n");
+		printf("NOK - Error creating DotU File from struct.\n");
+		nok++;
 	} else {
-		printf("Done creating file!");
+		printf("OK - Created DotU File from struct.\n");
+		ok++;
 	}
 	
 	/* Test adding an xattr value to an xattr that already exists */
-	printf("\n\nTesting adding an xattr to file.\n");
 	if(addAttr(&myDotU,"test1","value1-B")!=0){
-		printf("Error adding xattr\n");
+		printf("NOK - Error modifying xattr value via addAttr method.\n");
+		nok++;
 	} else {
-		printf("Added xattr\n");
+		printf("OK - Modified existing xattr's value via addAttr method.\n");
+		ok++;
 	}
-	printf("Index of new attr is: %i\n",getAttrIndex(myDotU,"test1"));
-	printf("Index of finder entry is: %i\n",getFinderInfoEntry(myDotU));
-	
-	
-	
-	
+	/*printf("Index of new attr is: %i\n",getAttrIndex(myDotU,"test1"));
+	 printf("Index of finder entry is: %i\n",getFinderInfoEntry(myDotU)); */
+	/* Create file to compare to previous - should match except for new value for xattr. */
 	if(createDotUFile(myDotU,argv[1],"-t3")!=0){
-		printf("\nError creating ._ file!\n");
+		printf("NOK - Error creating DotU File from struct.\n");
+		nok++;
 	} else {
-		printf("Done creating file!");
+		printf("OK - Created DotU File from struct.\n");
+		ok++;
+	}
+	
+	/* Test removing an xattr value that doesn't exist */
+	if(rmAttr(&myDotU,"test-does-not-exist")!=0){
+		printf("OK - Couldn't remove non-existent xattr.\n");
+		ok++;
+	} else {
+		printf("NOK - Removed non-existent xattr?\n");
+		nok++;
+	}
+	/* Create file to compare to previous - should match. */
+	if(createDotUFile(myDotU,argv[1],"-t4")!=0){
+		printf("NOK - Error creating DotU File from struct.\n");
+		nok++;
+	} else {
+		printf("OK - Created DotU File from struct.\n");
+		ok++;
+	}
+	
+
+	/* Test removing an xattr that does exist */
+	printf("\n\nTesting adding an xattr to file.\n");
+	if(rmAttr(&myDotU,"test1")!=0){
+		printf("NOK - Error removing existent xattr.\n");
+		nok++;
+	} else {
+		printf("OK - Removed existing xattr.\n");
+		ok++;
+	}
+	/* Create file to compare to previous - should match original file */
+	if(createDotUFile(myDotU,argv[1],"-t5")!=0){
+		printf("NOK - Error creating DotU File from struct.\n");
+		nok++;
+	} else {
+		printf("OK - Created DotU File from struct.\n");
+		ok++;
+	}
+	
+	
+	
+	
+	/* Create brand-new dotu struct */
+	myDotU = iniDotU(argv[1]);
+	/* Create dotU file - should have 0 xattrs */
+	if(createDotUFile(myDotU,argv[1],"-t6")!=0){
+		printf("NOK - Error creating DotU File from struct.\n");
+		nok++;
+	} else {
+		printf("OK - Created DotU File from struct.\n");
+		ok++;
+	}	
+	
+	/* Add an xattr to the blank dotu struct */
+	if(addAttr(&myDotU,"test1","value1")!=0){
+		printf("NOK - Error adding new xattr to blank struct.\n");
+		nok++;
+	} else {
+		printf("OK - Added new xattr to blank struct.\n");
+		ok++;
+	}
+	/* Create file to compare to previous - should match except for new xattr. */
+	if(createDotUFile(myDotU,argv[1],"-t7")!=0){
+		printf("NOK - Error creating DotU File file from struct.\n");
+		nok++;
+	} else {
+		printf("OK - Created DotU File from struct.\n");
+		ok++;
+	}
+	
+	
+
+
+	/* Print summary of tests */
+	if(nok==0) printf("All %u tests OK!\n",ok);
+	else {
+		printf("%u of %u tests failed.\n",nok,nok+ok);
 	}
 	
 	

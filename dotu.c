@@ -52,7 +52,6 @@ sizeNeeded(struct DotU dotU){
 			max = dotU.entry[i].offset+dotU.entry[i].length;
 		}
 	}
-	
 	return max;
 }
 
@@ -137,7 +136,7 @@ readDotUFile(const char *fileName){
 	/* Fill dotU struct */
 	printf("Setting up header\n"); /* DEBUG PRINT */
 	/* dotU header */
-	for(i=0;i<16;i++) dotU.header.magic[i] = (char) dotUBuffer[i];
+	dotU.header.magic      = (u_int32_t) toBigEndian(&dotUBuffer[4],4);
 	dotU.header.versionNum = (uint32_t) toBigEndian(&(dotUBuffer[4]),4);
 	for(i=0;i<16;i++) dotU.header.homeFileSystem[i] = (char) dotUBuffer[8+i];
 	dotU.header.numEntries = (uint16_t) toBigEndian(&dotUBuffer[24],2);
@@ -170,9 +169,7 @@ readDotUFile(const char *fileName){
 				for(i=0;i<2;i++){
 					dotU.entry[entryCount].data.finder.padding[i]               = dotUBuffer[dotU.entry[entryCount].offset+32+i];
 				}
-				for(i=0;i<4;i++){
-				dotU.entry[entryCount].data.finder.xattrHdr.headerMagic[i]    = dotUBuffer[dotU.entry[entryCount].offset+34+i];
-				}
+				dotU.entry[entryCount].data.finder.xattrHdr.headerMagic       = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+34],4);
 				dotU.entry[entryCount].data.finder.xattrHdr.debugTag          = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+38],4);
 				dotU.entry[entryCount].data.finder.xattrHdr.size              = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+42],4);
 				dotU.entry[entryCount].data.finder.xattrHdr.attrDataOffset    = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+46],4);
@@ -243,8 +240,7 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 	char *dotUFileName;
 	char *fileBuffer;
 	FILE *dotUFile;
-	uint32_t i,j;
-		uint32_t k;
+	uint32_t i,j,k;
 	uint32_t bufferSize;
 	uint32_t bufIndex;
 	
@@ -269,7 +265,7 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 	   16 bytes - home file system
 	   2 bytes  - number of dotU entries (usually 2)
 	*/
-	bufWrite(fileBuffer,0,dotU.header.magic,4);
+	bufWrite(fileBuffer,0,toSmallEndian((char*)&dotU.header.magic,4),4);
 	bufWrite(fileBuffer,4,toSmallEndian((char*)&dotU.header.versionNum,4),4);
 	bufWrite(fileBuffer,8,dotU.header.homeFileSystem,16);
 	bufWrite(fileBuffer,24,toSmallEndian((char*)&dotU.header.numEntries,2),2);
@@ -315,7 +311,7 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 					bufWrite(fileBuffer,dotU.entry[i].offset,dotU.entry[i].data.finder.finderHeader,32);
 					bufWrite(fileBuffer,dotU.entry[i].offset+32,dotU.entry[i].data.finder.padding,2);
 
-					bufWrite(fileBuffer,dotU.entry[i].offset+34,dotU.entry[i].data.finder.xattrHdr.headerMagic,4);
+					bufWrite(fileBuffer,dotU.entry[i].offset+34,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.headerMagic,4),4);
 					bufWrite(fileBuffer,dotU.entry[i].offset+38,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.debugTag,4),4);
 					bufWrite(fileBuffer,dotU.entry[i].offset+42,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.size,4),4);
 					bufWrite(fileBuffer,dotU.entry[i].offset+46,toSmallEndian((char*)&dotU.entry[i].data.finder.xattrHdr.attrDataOffset,4),4);
@@ -535,6 +531,12 @@ addAttr(struct DotU *dotU, const char * name, const char * value){
 		/* Remove the old value */
 		printf("Found attr %s\n",name);
 		free((*dotU).entry[finderEntry].data.finder.attr[index].value);
+		/* Add in the new one and be sure to set the length of it (length not including the \0). */
+		(*dotU).entry[finderEntry].data.finder.attr[index].value=malloc(sizeof(char)*strlen(value)+1);
+		strcpy((*dotU).entry[finderEntry].data.finder.attr[index].value,value);
+		(*dotU).entry[finderEntry].data.finder.attr[index].valueLength=strlen(value);
+		
+		
 	}	else {
 		/* Else if it is new, 
 		   - increment the number of xattrs
@@ -607,8 +609,8 @@ addAttr(struct DotU *dotU, const char * name, const char * value){
 		}
 		printf("Setting attr list\n");
 		/* set attrs in dotU */
-		/*free((*dotU).entry[finderEntry].data.finder.attr);
-		printf("Freed mem\n");*/
+		free((*dotU).entry[finderEntry].data.finder.attr);
+		printf("Freed mem\n");
 		(*dotU).entry[finderEntry].data.finder.attr=attrs;	
 		printf("Set attr ptr");
 		printf("New attr is %s \n",(*dotU).entry[finderEntry].data.finder.attr[index].name);
@@ -628,7 +630,55 @@ addAttr(struct DotU *dotU, const char * name, const char * value){
 /* Remove an extended attribute.  Return 0 if good, -1 if fail */
 int 
 rmAttr(struct DotU * dotU, const char * name){
-		/* TODO */
+	/* Find xattr */
+	int index=getAttrIndex((*dotU),name);
+	int finderEntry=getFinderInfoEntry((*dotU));
+	uint32_t attrNum,charNum;
+	struct ExtAttr* attrs;
+
+	/* If not found, return -1 */
+	if(index==-1) return -1;
+	
+	/* Create new struct, one xattr fewer */
+	(*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs--;
+	attrs=(struct ExtAttr*)malloc(sizeof(struct ExtAttr) * (*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs);
+	attrNum=0;
+	
+	
+	/* Copy everything except the one we're removing */
+	for(attrNum=0;attrNum<index;attrNum++){
+		/* Copy all attrs that come alphabetically before the one to be removed */
+		printf("Not there yet - rmAttr\n");
+		attrs[attrNum].name=malloc(sizeof(char)*strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].name)+1);
+		strcpy(attrs[attrNum].name,(*dotU).entry[finderEntry].data.finder.attr[attrNum].name);
+		attrs[attrNum].value=malloc(sizeof(char)*strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].value)+1);
+		strcpy(attrs[attrNum].value,(*dotU).entry[finderEntry].data.finder.attr[attrNum].value);
+		attrs[attrNum].nameLength=strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].name)+1;
+		attrs[attrNum].valueLength=strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].value);
+		for(charNum=0;charNum<2;charNum++) attrs[attrNum].flags[charNum]=(*dotU).entry[finderEntry].data.finder.attr[attrNum].flags[charNum];
+		printf("Keeping %s %s\n",attrs[attrNum].name,attrs[attrNum].value);
+	}
+	for(attrNum=index;attrNum<(*dotU).entry[finderEntry].data.finder.xattrHdr.numAttrs;attrNum++){
+		/* Copy all attrs that come alphabetically after the one to be removed */
+		printf("Copying rest of xattrs - rmAttr\n");
+		attrs[attrNum].name=malloc(sizeof(char)*strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].name)+1);
+		strcpy(attrs[attrNum].name,(*dotU).entry[finderEntry].data.finder.attr[attrNum].name);
+		attrs[attrNum].value=malloc(sizeof(char)*strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].value)+1);
+		strcpy(attrs[attrNum].value,(*dotU).entry[finderEntry].data.finder.attr[attrNum].value);
+		attrs[attrNum].nameLength=strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].name)+1;
+		attrs[attrNum].valueLength=strlen((*dotU).entry[finderEntry].data.finder.attr[attrNum].value);
+		for(charNum=0;charNum<2;charNum++) attrs[attrNum].flags[charNum]=(*dotU).entry[finderEntry].data.finder.attr[attrNum].flags[charNum];
+		printf("Keeping %s %s\n",attrs[attrNum].name,attrs[attrNum].value);
+	}
+	
+	/* Free the old memory */
+	free((*dotU).entry[finderEntry].data.finder.attr);
+	printf("Freed mem\n");
+		
+	/* Move the pointer. */
+	(*dotU).entry[finderEntry].data.finder.attr=attrs;	
+		printf("Set attr ptr");	
+	
 	return 0;
 }
 
@@ -690,4 +740,146 @@ void listAttrs(struct DotU dotU){
 	}
 	printf("\n");
 	return;
+}
+
+void 
+printDotUDetail(struct DotU dotU){
+	uint32_t i,j;
+	
+	/* Printing details of DotU Object */
+	printf("\nFile Magic Number: 0x%.8x",dotU.header.magic);
+	printf("\nFile Version Number: 0x%.8x",dotU.header.versionNum);
+	printf("\nFile Home File System: %16s",dotU.header.homeFileSystem);
+	printf("\nFile Number of entries: %i",dotU.header.numEntries);
+	
+
+	for(i=0;i<dotU.header.numEntries;i++){
+		printf("\nEntry ID: %i",dotU.entry[i].id);
+		printf("\n\tEntry Offset: %i", dotU.entry[i].offset);
+		printf("\n\tEntry Length: %i", dotU.entry[i].length);
+		
+		switch(dotU.entry[i].id){
+			case 2:{
+				printf("\n\tResource Fork.");
+				/* Shows data in the resource fork */
+				printf("\n\t\tData: ");
+				for(j=0;j<dotU.entry[i].length;j++)printChar(dotU.entry[i].data.resource.data[j]);
+			}break;
+			case 9:{
+				printf("\n\tFinder Info.");
+				printf("\n\tFirst 32 bytes reserved by FinderInfo (16 header, 16 extended): ");
+					for(j=0;j<32;j++) printChar(dotU.entry[i].data.finder.finderHeader[j]);
+				printf("\n\tPadding (16 bits): ");
+					for(j=0;j<2;j++) printChar(dotU.entry[i].data.finder.padding[j]);				
+				printf("\n\tExt Attr Header:");
+				printf("\n\t\tAttr Header Magic: %.8x",dotU.entry[i].data.finder.xattrHdr.headerMagic);				
+				printf("\n\t\tAttr Header Debug tag: %.8x",dotU.entry[i].data.finder.xattrHdr.debugTag);
+				printf("\n\t\tAttr Header Total Size: %i",dotU.entry[i].data.finder.xattrHdr.size);
+				printf("\n\t\tAttr Header Data Start: %i",dotU.entry[i].data.finder.xattrHdr.attrDataOffset);
+				printf("\n\t\tAttr Header Data Length: %i",dotU.entry[i].data.finder.xattrHdr.attrDataLength);
+				printf("\n\t\tAttr Header Reserved: ");
+					for(j=0;j<12;j++) printChar(dotU.entry[i].data.finder.xattrHdr.attrReserved[j]);				
+				printf("\n\t\tAttr Header Flags: ");
+					for(j=0;j<2;j++) printChar(dotU.entry[i].data.finder.xattrHdr.attrFlags[j]);				
+				printf("\n\t\tAttr Header Num Attrs: %i",dotU.entry[i].data.finder.xattrHdr.numAttrs);
+				
+				for(j=0;j<dotU.entry[i].data.finder.xattrHdr.numAttrs;j++){
+					printf("\n\t\t\tAttr #%i : %s : %s",j,dotU.entry[i].data.finder.attr[j].name,dotU.entry[i].data.finder.attr[j].value);
+				}
+				
+				
+			}break;
+			default: {
+				printf("Error - Unknown DotU Entry Type in input file.\n");
+			}break;
+			
+		}
+	
+	}
+
+}
+
+struct DotU iniDotU(const char * parentFileName){
+	/* Create dotU struct */
+	struct DotU dotU;
+	
+	struct stat statBuffer;
+	uint32_t i;
+	uint32_t entryCount,dotUOffset;
+	int fileDescriptor;
+	char *data;
+	FILE *dotUFile;
+	char *dotUBuffer;
+	int readChar;
+	uint32_t fileLength;
+	
+	struct ExtAttr *attrs;
+	char *entryName;
+	char *entryValue;
+	uint32_t charNum;
+	uint8_t entryNameLength;
+	uint32_t entryValueLength;
+	uint32_t entryHeaderOffset;
+	uint32_t entryValueOffset;
+	char attrFlags[2];
+	
+	
+	/* Fill dotU struct */
+	printf("Setting up header\n"); /* DEBUG PRINT */
+	/* dotU header */
+	dotU.header.magic = 0x00051607;
+	dotU.header.versionNum = 0x00020000;
+	strcpy(dotU.header.homeFileSystem,"Mac OS X        ");
+	dotU.header.numEntries = (uint16_t) 1; /* We don't need the resource fork if it's a brand new dotU file */
+	
+	
+	
+	/* The dotU file has various entries.
+	/ Extended attributes are usually in the Finder Info.*/
+	printf("Setting up dotu entries\n"); /* DEBUG PRINT */
+
+	/* Entry 0 will be the Finder Info (where the xattrs will go) */
+	dotU.entry[0].id=9;
+	dotU.entry[0].offset=50;
+	dotU.entry[0].length=4046;
+	/* The finder header is all 0's to start. Data in the header includes
+	   file type, file creator, some flag bits, and some stuff about the 
+	   Finder's GUI */
+	printf("Setting up Finder Info header.\n");
+	for(i=0;i<32;i++) dotU.entry[0].data.finder.finderHeader[i]='\0';
+	for(i=0;i<2;i++)  dotU.entry[0].data.finder.padding[i]     ='\0';      
+	
+	printf("Setting up Extended Finder Info.\n");   
+	dotU.entry[0].data.finder.xattrHdr.headerMagic = 0x41545452;
+	/* TODO: Get the file id */
+	/* dotU.entry[entryCount].data.finder.xattrHdr.debugTag          = (uint32_t) toBigEndian(&dotUBuffer[dotU.entry[entryCount].offset+38],4); */
+	printf("1");
+	dotU.entry[0].data.finder.xattrHdr.size              = (uint32_t) 4046;
+	printf("1");
+	dotU.entry[0].data.finder.xattrHdr.attrDataOffset    = (uint32_t) 120;
+	printf("1");
+	dotU.entry[0].data.finder.xattrHdr.attrDataLength    = (uint32_t) 0;
+	printf("1");
+	for(i=0;i<12;i++) dotU.entry[0].data.finder.xattrHdr.attrReserved[i] = 0;
+	printf("1");
+	for(i=0;i<2;i++)  dotU.entry[0].data.finder.xattrHdr.attrFlags[i]    = 0;
+	printf("1");
+	dotU.entry[0].data.finder.xattrHdr.numAttrs          = 0;
+	
+	/* Set up a blank resource fork */
+	/*printf("Setting up resource fork\n"); /* DEBUG PRINT */
+	/*dotU.entry[1].id = 2;
+	dotU.entry[1].offset = 3810;
+	dotU.entry[1].length = 286;
+	dotU.entry[1].data.resource.data=(char*)malloc(dotU.entry[1].length);
+	dotU.entry[entryCount].data.resource.data= TODO ;
+	*/
+
+	return dotU;
+	/*
+	
+	for(j=0;j<4;j++) printChar(dotU.header.magic[j]);
+	printf("\nFile Magic Number: 0x%.8x",dotU.header.magic);
+	
+	*/
 }
