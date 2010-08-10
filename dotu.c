@@ -13,7 +13,6 @@ bufWrite(char* buf,uint32_t startIndex,char* data,uint32_t length){
 	uint32_t i;
 	for(i=0;i<length;i++){
 		buf[startIndex+i] = data[i];
-		
 	}
 	return;
 }
@@ -255,6 +254,7 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 	bufferSize = sizeNeeded(dotU);
 	fileBuffer=(char *)malloc(sizeof(char)*bufferSize);
 	
+	/* Zero the buffer */
 	for(i=0;i<bufferSize;i++){
 		fileBuffer[i]='\0';
 	}
@@ -343,22 +343,10 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 							bufWrite(fileBuffer,bufIndex+10,(char*)&dotU.entry[i].data.finder.attr[j].nameLength,1); 
 							/* The name is stored in the dot-u file as a null-terminated string, 128 bytes max */
 							bufWrite(fileBuffer,bufIndex+11,dotU.entry[i].data.finder.attr[j].name,dotU.entry[i].data.finder.attr[j].nameLength);
-				
-
-
-	/*printf("\nBuffer is: Writing at buf index: %li\n",bufIndex+11);
-	for(k=0;k<bufferSize;k++) printChar(fileBuffer[k]);
-*/
-
 							printf("%s : %s at %u : %u\n",dotU.entry[i].data.finder.attr[j].name,dotU.entry[i].data.finder.attr[j].value,bufIndex+10,dotU.entry[i].data.finder.attr[j].valueOffset);
 							/* Write the value of the attr */
 							bufWrite(fileBuffer,dotU.entry[i].data.finder.attr[j].valueOffset,dotU.entry[i].data.finder.attr[j].value, dotU.entry[i].data.finder.attr[j].valueLength);
-							
-/*	printf("\nBuffer is: Writing at buf index: %u\n",dotU.entry[i].data.finder.attr[j].valueOffset);
-	for(k=0;k<bufferSize;k++) printChar(fileBuffer[k]);
-*/
 							bufIndex+=attrHdrSize(dotU.entry[i].data.finder.attr[j].nameLength);
-
 					}
 					
 					
@@ -367,6 +355,7 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 			/* Other/Unknown */
 			default:{ 
 				printf("Unknown DotU entry type.  Cannot write.\n");
+				return -1;
 			} break;
 		}
 		
@@ -379,8 +368,6 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 	printf("\nBuffer is:\n");
 	for(i=0;i<bufferSize;i++) printChar(fileBuffer[i]);
 	*/
-	
-	
 		
 	
 	printf("\nAllocating filename for ._\n");
@@ -679,7 +666,7 @@ rmAttr(struct DotU * dotU, const char * name){
 		
 	/* Move the pointer. */
 	(*dotU).entry[finderEntry].data.finder.attr=attrs;	
-		printf("Set attr ptr");	
+	printf("Set attr ptr");	
 	
 	return 0;
 }
@@ -868,7 +855,7 @@ struct DotU iniDotU(const char * parentFileName){
 	printf("1");
 	dotU.entry[0].data.finder.xattrHdr.numAttrs          = 0;
 	
-	/* Set up a blank resource fork */
+	/* Set up a blank resource fork - No need... */
 	/*printf("Setting up resource fork\n"); /* DEBUG PRINT */
 	/*dotU.entry[1].id = 2;
 	dotU.entry[1].offset = 3810;
@@ -878,10 +865,4 @@ struct DotU iniDotU(const char * parentFileName){
 	*/
 
 	return dotU;
-	/*
-	
-	for(j=0;j<4;j++) printChar(dotU.header.magic[j]);
-	printf("\nFile Magic Number: 0x%.8x",dotU.header.magic);
-	
-	*/
 }
