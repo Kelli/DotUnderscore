@@ -129,13 +129,13 @@ readDotUFile(const char *fileName){
 	
 	printf("Reading File\n"); /* DEBUG PRINT */
 
-	for (i = 0; (readChar = getc(dotUFile)) != EOF && i < fileLength; dotUBuffer[i++] = readChar) /* DEBUG ONLY */ printChar(readChar) ;
+	for (i = 0; (readChar = getc(dotUFile)) != EOF && i < fileLength; dotUBuffer[i++] = readChar) /* DEBUG ONLY  printChar(readChar) */;
 	fclose(dotUFile);
 	
 	/* Fill dotU struct */
 	printf("Setting up header\n"); /* DEBUG PRINT */
 	/* dotU header */
-	dotU.header.magic      = (u_int32_t) toBigEndian(&dotUBuffer[4],4);
+	dotU.header.magic      = (uint32_t) toBigEndian(&dotUBuffer[0],4);
 	dotU.header.versionNum = (uint32_t) toBigEndian(&(dotUBuffer[4]),4);
 	for(i=0;i<16;i++) dotU.header.homeFileSystem[i] = (char) dotUBuffer[8+i];
 	dotU.header.numEntries = (uint16_t) toBigEndian(&dotUBuffer[24],2);
