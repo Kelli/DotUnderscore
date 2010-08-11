@@ -20,7 +20,9 @@
 #include <sys/stat.h>
 
 
-
+#define MAXCOMMANDSIZE 255
+#define MAXDIRNAMESIZE 255
+#define MAXFILENAMESIZE 255
 
 struct DotUHeader {
 	uint32_t magic;
@@ -103,7 +105,9 @@ uint32_t attrHdrSize(uint32_t nameLength);
 
 struct DotU readDotUFile(const char *fileName);
 
-int createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffix);
+int createDotUFile(struct DotU dotU, const char * parentFileName);
+
+int createDotUFileSpecName(struct DotU dotU, const char * parentFileName, const char * outputFileName);
 
 int setOffsets(struct DotU * dotU);
 

@@ -235,7 +235,15 @@ readDotUFile(const char *fileName){
 } 
 
 int 
-createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffix){
+createDotUFile(struct DotU dotU, const char * parentFileName){
+	char dotUFileName[MAXFILENAMESIZE];
+	snprintf(dotUFileName,MAXFILENAMESIZE,"._%s",parentFileName);
+	return createDotUFileSpecName(dotU,parentFileName,dotUFileName);
+}
+
+
+int 
+createDotUFileSpecName(struct DotU dotU, const char * parentFileName, const char * outputFileName){
 	char *dotUFileName;
 	char *fileBuffer;
 	FILE *dotUFile;
@@ -370,25 +378,17 @@ createDotUFile(struct DotU dotU, const char * parentFileName, const char * suffi
 	*/
 		
 	
-	printf("\nAllocating filename for ._\n");
-	printf("Parent file name is %s and is %i characters long.\n",parentFileName,(int)strlen(parentFileName));
-	dotUFileName=(char*)malloc(sizeof(char) * (strlen(parentFileName)+strlen(suffix)));
-	/*strcpy(dotUFileName,prefix); */
-	strcpy(dotUFileName,parentFileName);
-	/* TODO: Max file name size? */
-	/*dotUFileName=strncat(dotUFileName,parentFileName,(strlen(parentFileName)+strlen(prefix)));*/
-	dotUFileName=strncat(dotUFileName,suffix,(strlen(parentFileName)+strlen(suffix)));
-	printf("Child file name is %s %s %s and is %i characters long.\n",suffix,parentFileName,dotUFileName,(int) (strlen(parentFileName)+strlen(suffix)));
-	
-	printf("Output file: %s\n",dotUFileName);
+	printf("Output file: %s\n",outputFileName);
 	
 	/* Create and write file */
-	dotUFile = fopen(dotUFileName, "wb");
+	dotUFile = fopen(outputFileName, "wb");
 	fwrite(fileBuffer,1,bufferSize,dotUFile);
 	fclose(dotUFile);
 	return 0;
 	
 }
+
+
 
 int 
 setOffsets(struct DotU *dotU){

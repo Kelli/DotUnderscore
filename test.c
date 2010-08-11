@@ -10,17 +10,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 
-#define MAXCOMMANDSIZE 255
+
 
 
 
 int main(int argc, char *argv[]){
 	struct DotU myDotU;
-	int i,j;
+	int i,j,testFileNum;
 	long ok=0;
 	long nok=0;
 	char testCommand[MAXCOMMANDSIZE];
+	char dirName[MAXDIRNAMESIZE];
+	char fileName[MAXFILENAMESIZE];
+	char testFilePrefix[MAXFILENAMESIZE];
+	char testFileName[MAXFILENAMESIZE];	
 	
 	if(argc!=2){
 		printf("Usage: %s filename\n",argv[0]);
@@ -30,15 +35,20 @@ int main(int argc, char *argv[]){
 	/* Start program */
 	printf("Welcome.\n");
 
+
 	/* Initializing DotU struct with data from file*/
 	myDotU = readDotUFile(argv[1]);
 	printDotUDetail(myDotU);
-
+	strcpy(dirName,dirname(argv[1]));
+	strcpy(fileName,basename(argv[1]));
+	printf("File is %s/%s\n",dirName,fileName);	
 	
+	testFileNum=0;
 	
-
 	/* Test the create file method */
-	if(createDotUFile(myDotU,argv[1],"-t0")!=0){
+	testFileNum++;
+	snprintf(testFileName,MAXFILENAMESIZE,"%s/t%i-%s",dirName,testFileNum,fileName);
+	if(createDotUFileSpecName(myDotU,argv[1],testFileName)!=0){
 		printf("NOK - Error creating DotU File from struct.\n");
 		nok++;
 	} else {
@@ -46,7 +56,7 @@ int main(int argc, char *argv[]){
 		ok++;
 	}
 	/* Should match original file */
-	snprintf(testCommand, MAXCOMMANDSIZE, "cmp -bl %s %s-t0",argv[1],argv[1]);
+	snprintf(testCommand, MAXCOMMANDSIZE, "cmp -bl %s %s",argv[1],testFileName);
 	if(system(testCommand)!=0){
 		printf("NOK - File recreated from struct does not match original file.\n");
 		nok++;
@@ -65,14 +75,16 @@ int main(int argc, char *argv[]){
 		ok++;
 	}
 	/* Create file to compare to previous - should match. */
-	if(createDotUFile(myDotU,argv[1],"-t1")!=0){
+	testFileNum++;
+	snprintf(testFileName,MAXFILENAMESIZE,"%s/t%i-%s",dirName,testFileNum,fileName);
+	if(createDotUFileSpecName(myDotU,argv[1],testFileName)!=0){
 		printf("NOK - Error creating DotU File from struct.\n");
 		nok++;
 	} else {
 		printf("OK - Created DotU File from struct.\n");
 		ok++;
 	}
-	snprintf(testCommand, MAXCOMMANDSIZE, "cmp -bl %s %s-t1",argv[1],argv[1]);
+	snprintf(testCommand, MAXCOMMANDSIZE, "cmp -bl %s %s",argv[1],testFileName);
 	if(system(testCommand)!=0){
 		printf("NOK - File recreated from struct does not match original file.\n");
 		nok++;
@@ -91,13 +103,17 @@ int main(int argc, char *argv[]){
 		ok++;
 	}
 	/* Create file to compare to previous - should match except for new xattr. */
-	if(createDotUFile(myDotU,argv[1],"-t2")!=0){
+	testFileNum++;
+	snprintf(testFileName,MAXFILENAMESIZE,"%s/t%i-%s",dirName,testFileNum,fileName);
+	if(createDotUFileSpecName(myDotU,argv[1],testFileName)!=0){
 		printf("NOK - Error creating DotU File from struct.\n");
 		nok++;
 	} else {
 		printf("OK - Created DotU File from struct.\n");
 		ok++;
 	}
+	/* TODO - add diff but take into account expected difference */
+
 	
 	/* Test adding an xattr value to an xattr that already exists */
 	if(addAttr(&myDotU,"test1","value1-B")!=0){
@@ -110,13 +126,17 @@ int main(int argc, char *argv[]){
 	/*printf("Index of new attr is: %i\n",getAttrIndex(myDotU,"test1"));
 	 printf("Index of finder entry is: %i\n",getFinderInfoEntry(myDotU)); */
 	/* Create file to compare to previous - should match except for new value for xattr. */
-	if(createDotUFile(myDotU,argv[1],"-t3")!=0){
+	testFileNum++;
+	snprintf(testFileName,MAXFILENAMESIZE,"%s/t%i-%s",dirName,testFileNum,fileName);
+	if(createDotUFileSpecName(myDotU,argv[1],testFileName)!=0){
 		printf("NOK - Error creating DotU File from struct.\n");
 		nok++;
 	} else {
 		printf("OK - Created DotU File from struct.\n");
 		ok++;
 	}
+	/* TODO - add diff but take into account expected difference */
+
 	
 	/* Test removing an xattr value that doesn't exist */
 	if(rmAttr(&myDotU,"test-does-not-exist")!=0){
@@ -127,11 +147,21 @@ int main(int argc, char *argv[]){
 		nok++;
 	}
 	/* Create file to compare to previous - should match. */
-	if(createDotUFile(myDotU,argv[1],"-t4")!=0){
+	testFileNum++;
+	snprintf(testFileName,MAXFILENAMESIZE,"%s/t%i-%s",dirName,testFileNum,fileName);
+	if(createDotUFileSpecName(myDotU,argv[1],testFileName)!=0){
 		printf("NOK - Error creating DotU File from struct.\n");
 		nok++;
 	} else {
 		printf("OK - Created DotU File from struct.\n");
+		ok++;
+	}
+	snprintf(testCommand, MAXCOMMANDSIZE, "cmp -bl %s/t%i-%s %s",dirName,testFileNum-1,fileName,testFileName);
+	if(system(testCommand)!=0){
+		printf("NOK - File doesn't match after trying to remove non-existent xattr.\n");
+		nok++;
+	} else {
+		printf("OK - File matches after trying to remove non-existent xattr.\n");
 		ok++;
 	}
 	
@@ -146,21 +176,30 @@ int main(int argc, char *argv[]){
 		ok++;
 	}
 	/* Create file to compare to previous - should match original file */
-	if(createDotUFile(myDotU,argv[1],"-t5")!=0){
+	testFileNum++;
+	snprintf(testFileName,MAXFILENAMESIZE,"%s/t%i-%s",dirName,testFileNum,fileName);
+	if(createDotUFileSpecName(myDotU,argv[1],testFileName)!=0){
 		printf("NOK - Error creating DotU File from struct.\n");
 		nok++;
 	} else {
 		printf("OK - Created DotU File from struct.\n");
 		ok++;
 	}
-	
-	
-	
+	snprintf(testCommand, MAXCOMMANDSIZE, "cmp -bl %s %s",argv[1],testFileName);
+	if(system(testCommand)!=0){
+		printf("NOK - File doesn't match after removing xattr we know exists.\n");
+		nok++;
+	} else {
+		printf("OK - File matches after removing known xattr.\n");
+		ok++;
+	}
 	
 	/* Create brand-new dotu struct */
 	myDotU = iniDotU(argv[1]);
 	/* Create dotU file - should have 0 xattrs */
-	if(createDotUFile(myDotU,argv[1],"-t6")!=0){
+	testFileNum++;
+	snprintf(testFileName,MAXFILENAMESIZE,"%s/t%i-%s",dirName,testFileNum,fileName);
+	if(createDotUFileSpecName(myDotU,argv[1],testFileName)!=0){
 		printf("NOK - Error creating DotU File from struct.\n");
 		nok++;
 	} else {
@@ -177,14 +216,16 @@ int main(int argc, char *argv[]){
 		ok++;
 	}
 	/* Create file to compare to previous - should match except for new xattr. */
-	if(createDotUFile(myDotU,argv[1],"-t7")!=0){
+	testFileNum++;
+	snprintf(testFileName,MAXFILENAMESIZE,"%s/t%i-%s",dirName,testFileNum,fileName);
+	if(createDotUFileSpecName(myDotU,argv[1],testFileName)!=0){
 		printf("NOK - Error creating DotU File file from struct.\n");
 		nok++;
 	} else {
 		printf("OK - Created DotU File from struct.\n");
 		ok++;
 	}
-	
+	/* TODO - add diff but take into account expected difference */
 	
 
 
