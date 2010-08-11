@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-
+#define MAXCOMMANDSIZE 255
 
 
 
@@ -20,6 +20,7 @@ int main(int argc, char *argv[]){
 	int i,j;
 	long ok=0;
 	long nok=0;
+	char testCommand[MAXCOMMANDSIZE];
 	
 	if(argc!=2){
 		printf("Usage: %s filename\n",argv[0]);
@@ -44,6 +45,15 @@ int main(int argc, char *argv[]){
 		printf("OK - Created DotU File from struct.\n");
 		ok++;
 	}
+	/* Should match original file */
+	snprintf(testCommand, MAXCOMMANDSIZE, "cmp -bl %s %s-t0",argv[1],argv[1]);
+	if(system(testCommand)!=0){
+		printf("NOK - File recreated from struct does not match original file.\n");
+		nok++;
+	} else {
+		printf("OK - File recreated from struct matches original file.\n");
+		ok++;
+	}
 	
 	
 	/* Test the calculations of the offsets */
@@ -60,6 +70,14 @@ int main(int argc, char *argv[]){
 		nok++;
 	} else {
 		printf("OK - Created DotU File from struct.\n");
+		ok++;
+	}
+	snprintf(testCommand, MAXCOMMANDSIZE, "cmp -bl %s %s-t1",argv[1],argv[1]);
+	if(system(testCommand)!=0){
+		printf("NOK - File recreated from struct does not match original file.\n");
+		nok++;
+	} else {
+		printf("OK - File recreated from struct matches original file.\n");
 		ok++;
 	}
 	
