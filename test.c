@@ -41,7 +41,7 @@ int main(int argc, char *argv[]){
 	printDotUDetail(myDotU);
 	strcpy(dirName,dirname(argv[1]));
 	strcpy(fileName,basename(argv[1]));
-	printf("File is %s/%s\n",dirName,fileName);	
+	printf("\n\nFile is %s/%s\n",dirName,fileName);	
 	
 	testFileNum=0;
 	
@@ -167,7 +167,6 @@ int main(int argc, char *argv[]){
 	
 
 	/* Test removing an xattr that does exist */
-	printf("\n\nTesting adding an xattr to file.\n");
 	if(rmAttr(&myDotU,"test1")!=0){
 		printf("NOK - Error removing existent xattr.\n");
 		nok++;

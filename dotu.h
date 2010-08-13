@@ -20,9 +20,14 @@
 #include <sys/stat.h>
 
 
-#define MAXCOMMANDSIZE 255
-#define MAXDIRNAMESIZE 255
+#define MAXCOMMANDSIZE 4095
+#define MAXDIRNAMESIZE 1023
 #define MAXFILENAMESIZE 255
+#define DOTUMAGIC 0x00051607
+#define ATTRHEADERMAGIC 0x41545452
+
+#define DEBUG 1
+
 
 struct DotUHeader {
 	uint32_t magic;
